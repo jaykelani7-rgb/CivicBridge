@@ -1,0 +1,38 @@
+{
+  "request_created_event": {
+    "event_id": "b514d49e-34bb-46fa-a10c-919721e528d1",
+    "event_type": "request.created.v1",
+    "schema_version": "1.0.0",
+    "occurred_at": "2026-08-20T10:30:00Z",
+    "producer": "citizen-channels",
+    "trace_id": "b96b5e2f-36e5-4d38-b490-794ad64d0198",
+    "data": {
+      "request_id": "84b50f3f-52c9-4ac5-bef0-03cc1ea43168",
+      "channel": "web_voice",
+      "country_code": "IN",
+      "language_hint": "hi-IN",
+      "content_ref": "private://citizen-content/84b50f3f-52c9-4ac5-bef0-03cc1ea43168",
+      "location": {
+        "precision": "approximate",
+        "latitude": 26.9124,
+        "longitude": 75.7873,
+        "admin_hint": "Jaipur"
+      },
+      "consent": {
+        "accepted": true,
+        "version": "2026-08-01"
+      },
+      "submitted_at": "2026-08-20T10:30:00Z"
+    }
+  },
+  "internal_content_response": {
+    "request_id": "84b50f3f-52c9-4ac5-bef0-03cc1ea43168",
+    "channel": "web_voice",
+    "language_hint": "hi-IN",
+    "country_code": "IN",
+    "text": "हमारे गाँव में पीने का साफ़ पानी नहीं आ रहा है, कृपया मदद करें।",
+    "media_ref": "private://citizen-media/84b50f3f.wav",
+    "media_type": "audio/wav",
+    "submitted_at": "2026-08-20T10:30:00Z"
+  }
+}

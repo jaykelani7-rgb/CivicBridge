@@ -1,0 +1,28 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Environment Variables & Secrets
+.env
+.env.local
+service-account*.json
+credentials.json
+
+# Local Media & Temp Data
+data/media/*
+!data/media/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
+
+# IDE / OS Artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
