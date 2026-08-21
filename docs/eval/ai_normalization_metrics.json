@@ -1,0 +1,1727 @@
+{
+  "fixture_count": 51,
+  "is_mock_run": true,
+  "note": "USE_MOCK_SERVICES=true: these metrics describe the deterministic mock rule engine, used to prove the pipeline/schema/routing logic is correct. Re-run with USE_MOCK_SERVICES=false and GCP_PROJECT_ID set against real Vertex AI Gemini before relying on these numbers for the submission.",
+  "category_extraction": {
+    "macro_f1": 1.0,
+    "target": 0.85,
+    "per_class": {
+      "connectivity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 1
+      },
+      "drainage": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 7
+      },
+      "education": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 1
+      },
+      "electricity": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 7
+      },
+      "health": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 2
+      },
+      "other": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 7
+      },
+      "roads": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 8
+      },
+      "sanitation": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 2
+      },
+      "transport": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 1
+      },
+      "waste": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 5
+      },
+      "water": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 10
+      }
+    }
+  },
+  "urgency": {
+    "weighted_f1": 0.9225490196078431,
+    "target": 0.8,
+    "per_class": {
+      "critical": {
+        "precision": 0.875,
+        "recall": 1.0,
+        "f1": 0.9333333333333333,
+        "support": 14
+      },
+      "high": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 17
+      },
+      "low": {
+        "precision": 0.6,
+        "recall": 1.0,
+        "f1": 0.7499999999999999,
+        "support": 3
+      },
+      "medium": {
+        "precision": 1.0,
+        "recall": 0.7647058823529411,
+        "f1": 0.8666666666666666,
+        "support": 17
+      }
+    }
+  },
+  "schema_valid_rate": 1.0,
+  "schema_valid_target": 0.99,
+  "needs_human_review_routing": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "pii_detection": {
+    "phone": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "email": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "person_name": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "exact_home": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    }
+  },
+  "rows": [
+    {
+      "id": "hi-01",
+      "tags": [
+        "language:hi"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "hi-02",
+      "tags": [
+        "language:hi"
+      ],
+      "category": {
+        "expected": "roads",
+        "predicted": "roads",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": false,
+        "predicted": false,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "hi-03",
+      "tags": [
+        "language:hi"
+      ],
+      "category": {
+        "expected": "drainage",
+        "predicted": "drainage",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "hi-04",
+      "tags": [
+        "language:hi"
+      ],
+      "category": {
+        "expected": "electricity",
+        "predicted": "electricity",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "hi-05",
+      "tags": [
+        "language:hi"
+      ],
+      "category": {
+        "expected": "sanitation",
+        "predicted": "sanitation",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pt-01",
+      "tags": [
+        "language:pt"
+      ],
+      "category": {
+        "expected": "roads",
+        "predicted": "roads",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": false,
+        "predicted": false,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pt-02",
+      "tags": [
+        "language:pt"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pt-03",
+      "tags": [
+        "language:pt"
+      ],
+      "category": {
+        "expected": "drainage",
+        "predicted": "drainage",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pt-04",
+      "tags": [
+        "language:pt"
+      ],
+      "category": {
+        "expected": "electricity",
+        "predicted": "electricity",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pt-05",
+      "tags": [
+        "language:pt"
+      ],
+      "category": {
+        "expected": "waste",
+        "predicted": "waste",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "en-01",
+      "tags": [
+        "language:en",
+        "country:ZA"
+      ],
+      "category": {
+        "expected": "connectivity",
+        "predicted": "connectivity",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "en-02",
+      "tags": [
+        "language:en",
+        "country:ZA"
+      ],
+      "category": {
+        "expected": "transport",
+        "predicted": "transport",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "en-03",
+      "tags": [
+        "language:en",
+        "country:ZA"
+      ],
+      "category": {
+        "expected": "health",
+        "predicted": "health",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "en-04",
+      "tags": [
+        "language:en",
+        "country:ZA"
+      ],
+      "category": {
+        "expected": "education",
+        "predicted": "education",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "en-05",
+      "tags": [
+        "language:en",
+        "country:IN"
+      ],
+      "category": {
+        "expected": "roads",
+        "predicted": "roads",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "xh-01",
+      "tags": [
+        "language:xh"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "xh-02",
+      "tags": [
+        "language:xh"
+      ],
+      "category": {
+        "expected": "roads",
+        "predicted": "roads",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": false,
+        "predicted": false,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "xh-03",
+      "tags": [
+        "language:xh"
+      ],
+      "category": {
+        "expected": "electricity",
+        "predicted": "electricity",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "zu-01",
+      "tags": [
+        "language:zu"
+      ],
+      "category": {
+        "expected": "drainage",
+        "predicted": "drainage",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "zu-02",
+      "tags": [
+        "language:zu"
+      ],
+      "category": {
+        "expected": "waste",
+        "predicted": "waste",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "mix-01",
+      "tags": [
+        "code-mixed",
+        "language:hi-en"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "mix-02",
+      "tags": [
+        "code-mixed",
+        "language:pt-en"
+      ],
+      "category": {
+        "expected": "roads",
+        "predicted": "roads",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "mix-03",
+      "tags": [
+        "code-mixed",
+        "language:xh-en"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "amb-cat-01",
+      "tags": [
+        "ambiguous_category"
+      ],
+      "category": {
+        "expected": "other",
+        "predicted": "other",
+        "match": true
+      },
+      "urgency": {
+        "expected": "low",
+        "predicted": "low",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "amb-cat-02",
+      "tags": [
+        "ambiguous_category"
+      ],
+      "category": {
+        "expected": "other",
+        "predicted": "other",
+        "match": true
+      },
+      "urgency": {
+        "expected": "low",
+        "predicted": "low",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "amb-cat-03",
+      "tags": [
+        "ambiguous_category"
+      ],
+      "category": {
+        "expected": "other",
+        "predicted": "other",
+        "match": true
+      },
+      "urgency": {
+        "expected": "low",
+        "predicted": "low",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "amb-loc-01",
+      "tags": [
+        "ambiguous_location"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "amb-loc-02",
+      "tags": [
+        "ambiguous_location"
+      ],
+      "category": {
+        "expected": "electricity",
+        "predicted": "electricity",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "amb-loc-03",
+      "tags": [
+        "ambiguous_location"
+      ],
+      "category": {
+        "expected": "waste",
+        "predicted": "waste",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-01a",
+      "tags": [
+        "duplicate_family:drain-w42"
+      ],
+      "category": {
+        "expected": "drainage",
+        "predicted": "drainage",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-01b",
+      "tags": [
+        "duplicate_family:drain-w42"
+      ],
+      "category": {
+        "expected": "drainage",
+        "predicted": "drainage",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-02a",
+      "tags": [
+        "duplicate_family:water-bairro-a"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-02b",
+      "tags": [
+        "duplicate_family:water-bairro-a"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-03a",
+      "tags": [
+        "duplicate_family:power-ward12"
+      ],
+      "category": {
+        "expected": "electricity",
+        "predicted": "electricity",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-03b",
+      "tags": [
+        "duplicate_family:power-ward12"
+      ],
+      "category": {
+        "expected": "electricity",
+        "predicted": "electricity",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-04a",
+      "tags": [
+        "duplicate_family:pothole-mainrd"
+      ],
+      "category": {
+        "expected": "roads",
+        "predicted": "roads",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": false,
+        "predicted": false,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-04b",
+      "tags": [
+        "duplicate_family:pothole-mainrd"
+      ],
+      "category": {
+        "expected": "roads",
+        "predicted": "roads",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": false,
+        "predicted": false,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-05a",
+      "tags": [
+        "duplicate_family:waste-sectorc"
+      ],
+      "category": {
+        "expected": "waste",
+        "predicted": "waste",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": false,
+        "predicted": false,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "dup-05b",
+      "tags": [
+        "duplicate_family:waste-sectorc"
+      ],
+      "category": {
+        "expected": "waste",
+        "predicted": "waste",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": false,
+        "predicted": false,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "urg-01",
+      "tags": [
+        "high_urgency"
+      ],
+      "category": {
+        "expected": "electricity",
+        "predicted": "electricity",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "urg-02",
+      "tags": [
+        "high_urgency"
+      ],
+      "category": {
+        "expected": "drainage",
+        "predicted": "drainage",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "urg-03",
+      "tags": [
+        "high_urgency"
+      ],
+      "category": {
+        "expected": "sanitation",
+        "predicted": "sanitation",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "urg-04",
+      "tags": [
+        "high_urgency"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "critical",
+        "predicted": "critical",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pii-01",
+      "tags": [
+        "pii:phone"
+      ],
+      "category": {
+        "expected": "water",
+        "predicted": "water",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "phone"
+        ],
+        "predicted": [
+          "phone"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pii-02",
+      "tags": [
+        "pii:email"
+      ],
+      "category": {
+        "expected": "roads",
+        "predicted": "roads",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "medium",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "email"
+        ],
+        "predicted": [
+          "email"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pii-03",
+      "tags": [
+        "pii:person_name"
+      ],
+      "category": {
+        "expected": "health",
+        "predicted": "health",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "person_name"
+        ],
+        "predicted": [
+          "person_name"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "pii-04",
+      "tags": [
+        "pii:exact_home"
+      ],
+      "category": {
+        "expected": "drainage",
+        "predicted": "drainage",
+        "match": true
+      },
+      "urgency": {
+        "expected": "high",
+        "predicted": "high",
+        "match": true
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "exact_home"
+        ],
+        "predicted": [
+          "exact_home"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "inj-01",
+      "tags": [
+        "prompt_injection"
+      ],
+      "category": {
+        "expected": "other",
+        "predicted": "other",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "critical",
+        "match": false
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "inj-02",
+      "tags": [
+        "prompt_injection"
+      ],
+      "category": {
+        "expected": "other",
+        "predicted": "other",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "low",
+        "match": false
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "inj-03",
+      "tags": [
+        "prompt_injection"
+      ],
+      "category": {
+        "expected": "other",
+        "predicted": "other",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "low",
+        "match": false
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    },
+    {
+      "id": "inj-04",
+      "tags": [
+        "prompt_injection"
+      ],
+      "category": {
+        "expected": "other",
+        "predicted": "other",
+        "match": true
+      },
+      "urgency": {
+        "expected": "medium",
+        "predicted": "critical",
+        "match": false
+      },
+      "needs_human_review": {
+        "expected": true,
+        "predicted": true,
+        "match": true
+      },
+      "pii_flags": {
+        "expected": [
+          "none"
+        ],
+        "predicted": [
+          "none"
+        ]
+      },
+      "schema_valid": true,
+      "extraction_status": "mock"
+    }
+  ]
+}

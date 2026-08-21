@@ -1,0 +1,472 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CivicBridge AI - AI Normalization Service",
+    "description": "Speech-to-Text, Translation, and Gemini structured extraction for citizen requests. Owned by Shreyank.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/normalizations": {
+      "post": {
+        "summary": "Create Normalization",
+        "operationId": "create_normalization_internal_v1_normalizations_post",
+        "parameters": [
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Trace-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NormalizeRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NormalizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/normalizations/{request_id}": {
+      "get": {
+        "summary": "Get Normalization",
+        "operationId": "get_normalization_internal_v1_normalizations__request_id__get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NormalizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/normalizations/{request_id}/retry": {
+      "post": {
+        "summary": "Retry Normalization",
+        "operationId": "retry_normalization_internal_v1_normalizations__request_id__retry_post",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "X-Trace-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Trace-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NormalizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/policy-briefs/draft": {
+      "post": {
+        "summary": "Generate Policy Brief Draft",
+        "operationId": "generate_policy_brief_draft_internal_v1_policy_briefs_draft_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyBriefDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "NormalizationResponse": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "normalized | needs_review"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "result": {
+            "$ref": "#/components/schemas/NormalizedRequestData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "status",
+          "attempts",
+          "updated_at",
+          "result"
+        ],
+        "title": "NormalizationResponse"
+      },
+      "NormalizeRequestBody": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id",
+            "description": "Citizen request ID assigned by Citizen Channels"
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Re-run the pipeline even if a result is already cached",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id"
+        ],
+        "title": "NormalizeRequestBody"
+      },
+      "NormalizedRequestData": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "country_code": {
+            "type": "string",
+            "title": "Country Code"
+          },
+          "original_language": {
+            "type": "string",
+            "title": "Original Language"
+          },
+          "transcript_original": {
+            "type": "string",
+            "title": "Transcript Original"
+          },
+          "translation_working": {
+            "type": "string",
+            "title": "Translation Working"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "water, sanitation, roads, drainage, electricity, connectivity, transport, health, education, waste, housing, environment, other"
+          },
+          "subcategory": {
+            "type": "string",
+            "title": "Subcategory"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "problem_description": {
+            "type": "string",
+            "title": "Problem Description"
+          },
+          "requested_outcome": {
+            "type": "string",
+            "title": "Requested Outcome"
+          },
+          "urgency": {
+            "type": "string",
+            "title": "Urgency"
+          },
+          "affected_scope": {
+            "type": "string",
+            "title": "Affected Scope"
+          },
+          "location_mentions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Location Mentions"
+          },
+          "evidence_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Types"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "pii_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pii Flags"
+          },
+          "needs_human_review": {
+            "type": "boolean",
+            "title": "Needs Human Review",
+            "default": false
+          },
+          "review_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Reason"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "gemini-1.5-flash"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version",
+            "default": "normalize-1.0.0"
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "default": "normalized-request-1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "country_code",
+          "original_language",
+          "transcript_original",
+          "translation_working",
+          "category",
+          "subcategory",
+          "summary",
+          "problem_description",
+          "requested_outcome",
+          "urgency",
+          "affected_scope",
+          "confidence"
+        ],
+        "title": "NormalizedRequestData"
+      },
+      "PolicyBriefDraftRequest": {
+        "properties": {
+          "hotspot_id": {
+            "type": "string",
+            "title": "Hotspot Id"
+          },
+          "evidence_bundle_id": {
+            "type": "string",
+            "title": "Evidence Bundle Id"
+          },
+          "evidence_bundle": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Evidence Bundle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hotspot_id",
+          "evidence_bundle_id",
+          "evidence_bundle"
+        ],
+        "title": "PolicyBriefDraftRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

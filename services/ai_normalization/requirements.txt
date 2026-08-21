@@ -1,0 +1,18 @@
+# Core service dependencies -- run with USE_MOCK_SERVICES=true (default) and none
+# of the Google Cloud client libraries below are ever imported.
+fastapi>=0.110.0
+uvicorn>=0.28.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+httpx>=0.27.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+python-multipart>=0.0.9
+
+# Optional: only required when USE_MOCK_SERVICES=false. Installed lazily/guarded
+# with try/except at import time (see pipeline/speech.py, pipeline/translation.py,
+# pipeline/extraction.py, pipeline/policy_brief.py) so their absence never breaks
+# the mock-mode demo path.
+# google-cloud-speech>=2.24.0
+# google-cloud-translate>=3.15.0
+# google-cloud-aiplatform>=1.45.0
