@@ -6,7 +6,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 ALLOWED_CATEGORIES = {
     "water", "sanitation", "roads", "drainage", "electricity", "connectivity",
     "transport", "health", "education", "waste", "housing", "environment", "other",
@@ -107,6 +106,10 @@ class EventEnvelope(BaseModel, Generic[T]):
         if value.tzinfo is None:
             raise ValueError("occurred_at must include a timezone")
         return value.astimezone(timezone.utc)
+
+
+class NormalizedRequestEvent(EventEnvelope[NormalizedRequest]):
+    event_type: Literal["request.normalized.v1"]
 
 
 class HotspotUpdatedData(BaseModel):

@@ -79,6 +79,7 @@ The country packs provide two administrative areas per country, versioned bounda
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `POST` | `/internal/v1/intelligence/requests/{request_id}/process` | Process or safely replay one normalized event |
+| `POST` | `/pubsub/request-normalized` | Receive authenticated Pub/Sub push delivery for `request.normalized.v1` |
 | `GET` | `/v1/hotspots` | Paginated/filterable hotspot list |
 | `GET` | `/v1/hotspots/{hotspot_id}` | Current aggregate, geography, confidence, and warnings |
 | `GET` | `/v1/hotspots/{hotspot_id}/evidence` | Immutable bounded evidence bundle |
@@ -121,6 +122,52 @@ curl -X POST http://localhost:8080/internal/v1/intelligence/requests/84b50f3f-52
 ```
 
 Exact household coordinates and raw PII fields are rejected or kept out of analytical outputs. Requests flagged for review, below the safe confidence rule, or with ambiguous geography return `pending_review` and never enter an active hotspot.
+
+### Pub/Sub push delivery on Cloud Run
+
+The existing `data-intelligence-normalized` subscription should push messages from the
+`request-normalized-v1` topic to:
+
+```text
+https://YOUR_CLOUD_RUN_SERVICE_URL/pubsub/request-normalized
+```
+
+The route accepts the standard wrapped Pub/Sub envelope, strictly decodes `message.data` as Base64 JSON,
+validates `request.normalized.v1`, and delegates to the same `NormalizedRequestConsumer` and transactional pipeline
+used by local HTTP and pull delivery. It returns `204` only after processing commits. Malformed deliveries receive
+`400`; retryable dependency failures receive `503`; unexpected internal failures receive `500`. Repeated `event_id`
+values replay the stored result without duplicating embeddings, cluster members, hotspots, or outbox events.
+In production, set `CB_IDEMPOTENCY_BACKEND=bigquery` with `CB_BIGQUERY_PROJECT` and `CB_BIGQUERY_DATASET`.
+The durable `processed_event_deliveries` ledger stores only safe identifiers, version, status, claim token, and
+timestamps; it never stores the Pub/Sub payload or citizen text. Local mode keeps transactional SQLite idempotency.
+
+Cloud Run should require authentication. Configure Pub/Sub push authentication with a dedicated Google-managed or
+user-managed runtime identity and an OIDC audience matching the Cloud Run service URL. Grant that identity
+`roles/run.invoker`; the Pub/Sub service agent must be allowed to mint an OIDC token for it. No custom shared secret,
+Gemini API key, or service-account JSON key is needed. With the service and identity already created, the relevant
+configuration is equivalent to:
+
+```bash
+gcloud run services add-iam-policy-binding DATA_INTELLIGENCE_SERVICE \
+  --region=us-central1 \
+  --member="serviceAccount:PUBSUB_PUSH_SERVICE_ACCOUNT" \
+  --role="roles/run.invoker"
+
+gcloud pubsub subscriptions modify-push-config data-intelligence-normalized \
+  --push-endpoint="https://YOUR_CLOUD_RUN_SERVICE_URL/pubsub/request-normalized" \
+  --push-auth-service-account="PUBSUB_PUSH_SERVICE_ACCOUNT" \
+  --push-auth-token-audience="https://YOUR_CLOUD_RUN_SERVICE_URL"
+```
+
+Keep the existing subscription retry/dead-letter policy enabled. Cloud Run validates the OIDC token before the
+request reaches FastAPI; the application endpoint intentionally does not implement a second secret mechanism.
+
+Run the push adapter tests locally without Google Cloud credentials:
+
+```bash
+cd services/data-intelligence
+SIMILARITY_PROVIDER=lexical .venv/bin/pytest -q tests/integration/test_pubsub_push.py
+```
 
 ### Query results
 
@@ -212,12 +259,13 @@ All values and descriptions are in `.env.example`:
 - Duplicate matching: `CB_DUPLICATE_DISTANCE_KM`, `CB_DUPLICATE_TIME_WINDOW_DAYS`, `CB_DUPLICATE_HIGH_THRESHOLD`, `CB_DUPLICATE_REVIEW_THRESHOLD`.
 - Scoring/API: `CB_SCORE_VERSION`, `CB_DEFAULT_PAGE_SIZE`, `CB_MAX_PAGE_SIZE`.
 - BigQuery: `CB_BIGQUERY_PROJECT`, `CB_BIGQUERY_DATASET`, `CB_BIGQUERY_RAW_DATASET`, `CB_BIGQUERY_LOCATION`, `CB_BIGQUERY_S2_LEVEL`.
-- Events: `CB_EVENT_BUS`, `CB_PUBSUB_PROJECT`, `CB_PUBSUB_TOPIC`, `CB_PUBSUB_SUBSCRIPTION`.
+- Events: `CB_EVENT_BUS`, `CB_PUBSUB_PROJECT`, `CB_PUBSUB_TOPIC`, `CB_PUBSUB_SUBSCRIPTION`,
+  `CB_IDEMPOTENCY_BACKEND`.
 - Similarity: `SIMILARITY_PROVIDER`, `VERTEX_EMBEDDING_MODEL`, `EMBEDDING_DIMENSION`,
   `DUPLICATE_SIMILARITY_THRESHOLD`, `RELATED_SIMILARITY_THRESHOLD`, timeout/retry/batch limits.
 - Vertex runtime: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `RUN_VERTEX_INTEGRATION_TESTS`.
 
-Production configuration fails at startup if a selected BigQuery or Pub/Sub dependency lacks required identifiers. Install `.[production]` for Google Cloud SDKs. BigQuery reads use named query parameters and GIS uses `ST_COVERS(..., ST_GEOGPOINT(...))` against versioned boundaries. The transactional operational store remains separate from analytical BigQuery reads.
+Production configuration fails at startup if a selected BigQuery or Pub/Sub dependency lacks required identifiers. Install `.[production]` for Google Cloud SDKs. BigQuery reads use named query parameters and GIS uses `ST_COVERS(..., ST_GEOGPOINT(...))` against versioned boundaries. The transactional operational store remains separate from analytical BigQuery reads. In Cloud Run, enable the BigQuery delivery ledger because SQLite files are ephemeral. Cluster, hotspot, evidence, and outbox records still use SQLite in this release and remain a documented production limitation until a supported durable operational repository is introduced; BigQuery is not treated as a full transactional replacement for Cloud SQL.
 
 Vertex mode also fails startup with an actionable error when project, location, model, dimension, timeout, batch size,
 or thresholds are invalid. Local development authenticates with:

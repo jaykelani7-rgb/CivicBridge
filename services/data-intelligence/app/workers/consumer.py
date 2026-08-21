@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Union
 
-from app.schemas.events import EventEnvelope, NormalizedRequest
+from app.schemas.events import NormalizedRequestEvent
 
 
 class NormalizedRequestConsumer:
@@ -17,7 +17,10 @@ class NormalizedRequestConsumer:
             payload = payload.decode("utf-8")
         if isinstance(payload, str):
             payload = json.loads(payload)
-        envelope = EventEnvelope[NormalizedRequest].model_validate(payload)
+        envelope = NormalizedRequestEvent.model_validate(payload)
+        return self.handle_event(envelope)
+
+    def handle_event(self, envelope: NormalizedRequestEvent) -> dict:
         return self.pipeline.process(envelope)
 
     def pubsub_callback(self, message: Any) -> None:

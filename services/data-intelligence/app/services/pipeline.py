@@ -3,18 +3,22 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Iterator, Optional
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from app.domain.errors import DomainError, NotFoundError
 from app.domain.models import Geography, Metrics
-from app.schemas.events import EventEnvelope, HotspotUpdatedData, HotspotUpdatedEvent, NormalizedRequest
+from app.schemas.events import (
+    EventEnvelope,
+    HotspotUpdatedData,
+    HotspotUpdatedEvent,
+    NormalizedRequest,
+)
 from app.services.duplicates import DuplicateDetector
 from app.services.evidence import build_evidence_bundle
 from app.services.outbox import OutboxDispatcher
 from app.services.scoring import ScoringEngine
-
 
 logger = logging.getLogger("civicbridge.data_intelligence")
 
@@ -56,6 +60,13 @@ class IntelligencePipeline:
         self.metrics.increment("events_received")
         if envelope.event_type != "request.normalized.v1":
             raise DomainError("NORMALIZED_REQUEST_INVALID", "Expected request.normalized.v1 event.", details=[{"field":"event_type","reason":"unsupported event"}])
+
+        existing = self.repository.get_processed_event(event_id)
+        if existing and existing["status"] == "completed":
+            self.metrics.increment("duplicate_deliveries_ignored")
+            result = self._stored_result(existing, trace_id)
+            self.outbox.dispatch()
+            return result
 
         try:
             with self.repository.transaction():
@@ -147,7 +158,7 @@ class IntelligencePipeline:
                 except Exception:
                     pass
             raise
-        except Exception as exc:
+        except Exception:
             now = utc_now()
             try:
                 with self.repository.transaction():

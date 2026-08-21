@@ -32,6 +32,7 @@ class Settings:
     default_page_size: int = 20
     max_page_size: int = 100
     event_bus: str = "memory"
+    idempotency_backend: str = "local"
     bigquery_project: Optional[str] = None
     bigquery_dataset: Optional[str] = None
     bigquery_location: str = "US"
@@ -79,6 +80,7 @@ class Settings:
             default_page_size=int(_env(source, "CB_DEFAULT_PAGE_SIZE", "20")),
             max_page_size=int(_env(source, "CB_MAX_PAGE_SIZE", "100")),
             event_bus=_env(source, "CB_EVENT_BUS", "memory"),
+            idempotency_backend=_env(source, "CB_IDEMPOTENCY_BACKEND", "bigquery" if runtime_mode == "google" else "local").lower(),
             bigquery_project=source.get("CB_BIGQUERY_PROJECT") or None,
             bigquery_dataset=source.get("CB_BIGQUERY_DATASET") or None,
             bigquery_location=_env(source, "CB_BIGQUERY_LOCATION", "US"),
@@ -115,6 +117,8 @@ class Settings:
             raise ValueError("CB_GEOGRAPHY_PROVIDER must be local or bigquery")
         if self.event_bus not in {"memory", "pubsub"}:
             raise ValueError("CB_EVENT_BUS must be memory or pubsub")
+        if self.idempotency_backend not in {"local", "bigquery"}:
+            raise ValueError("CB_IDEMPOTENCY_BACKEND must be local or bigquery")
         if self.similarity_provider not in {"lexical", "vertex"}:
             raise ValueError("SIMILARITY_PROVIDER must be lexical or vertex")
         if not 0 <= self.related_similarity_threshold < self.duplicate_similarity_threshold <= 1:
@@ -154,6 +158,8 @@ class Settings:
                     raise ValueError(f"{name} contains an invalid identifier")
             if not re.fullmatch(r"[A-Za-z0-9-]+",self.bigquery_location):
                 raise ValueError("CB_BIGQUERY_LOCATION contains an invalid location")
+        if self.idempotency_backend == "bigquery" and not (self.bigquery_project and self.bigquery_dataset):
+            raise ValueError("BigQuery project and dataset are required for BigQuery idempotency")
         if self.environment == "production":
             if self.event_bus == "pubsub" and not self.pubsub_project:
                 raise ValueError("Pub/Sub project is required in production")

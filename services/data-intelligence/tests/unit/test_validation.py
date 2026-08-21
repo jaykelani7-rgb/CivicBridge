@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.events import EventEnvelope, NormalizedRequest
 from app.config.settings import Settings
+from app.schemas.events import EventEnvelope, NormalizedRequest
 from tests.conftest import event_payload
 
 
@@ -36,6 +36,7 @@ def test_google_mode_selects_bigquery_but_keeps_sqlite_operational_store():
     assert settings.storage_backend=="sqlite"
     assert settings.analytical_backend=="bigquery"
     assert settings.geography_provider=="bigquery"
+    assert settings.idempotency_backend=="bigquery"
     assert settings.effective_raw_dataset=="intelligence_raw"
     assert settings.bigquery_s2_level==13
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
@@ -9,9 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.adapters.geospatial.local import LocalGeographyProvider
 from app.adapters.bigquery.geography import BigQueryGeographyProvider
+from app.adapters.bigquery.idempotency import BigQueryDeliveryIdempotencyStore
 from app.adapters.bigquery.repository import BigQueryAnalyticalRepository
+from app.adapters.geospatial.local import LocalGeographyProvider
 from app.adapters.local.fixtures import load_fixtures
 from app.adapters.pubsub.publisher import InMemoryEventPublisher, PubSubEventPublisher
 from app.adapters.similarity.factory import build_similarity_service
@@ -19,15 +19,19 @@ from app.api.routes import router
 from app.config.logging import configure_logging
 from app.config.settings import Settings
 from app.domain.errors import DomainError
+from app.domain.idempotency import PipelineDeliveryIdempotencyStore
 from app.domain.models import Metrics
-from app.domain.ports import FallbackAnalyticalRepository, FallbackEmbeddingRepository, FallbackGeographyProvider
+from app.domain.ports import (
+    FallbackAnalyticalRepository,
+    FallbackEmbeddingRepository,
+    FallbackGeographyProvider,
+)
 from app.repositories.sqlite import SQLiteRepository
 from app.services.duplicates import DuplicateDetector
 from app.services.outbox import OutboxDispatcher
 from app.services.pipeline import IntelligencePipeline
 from app.services.scoring import ScoringEngine
 from app.workers.consumer import NormalizedRequestConsumer
-
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
@@ -82,6 +86,9 @@ def create_app(settings: Optional[Settings] = None, *, publisher=None) -> FastAP
     app.state.primary_analytical_repository = primary_analytical_repository
     app.state.primary_geography_provider = primary_geography
     app.state.pipeline,app.state.consumer,app.state.metrics = pipeline,NormalizedRequestConsumer(pipeline),metrics
+    app.state.delivery_idempotency = (BigQueryDeliveryIdempotencyStore(
+        settings.bigquery_project or "", settings.bigquery_dataset or "", settings.bigquery_location
+    ) if settings.idempotency_backend == "bigquery" else PipelineDeliveryIdempotencyStore())
     app.include_router(router)
 
     @app.exception_handler(DomainError)

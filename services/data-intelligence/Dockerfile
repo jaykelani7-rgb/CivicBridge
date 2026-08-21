@@ -5,7 +5,7 @@ COPY pyproject.toml README.md ./
 COPY app ./app
 COPY migrations ./migrations
 COPY fixtures ./fixtures
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir '.[production]'
 RUN useradd --create-home --uid 10001 appuser && mkdir -p /service/data && chown -R appuser:appuser /service
 USER appuser
 EXPOSE 8080

@@ -1,17 +1,176 @@
 from __future__ import annotations
 
+import base64
+import binascii
+import json
+import logging
 import math
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Header, Query, Request, Response
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.domain.errors import DomainError, NotFoundError
 from app.schemas.api import RecalculateRequest
-from app.schemas.events import EventEnvelope, NormalizedRequest
-
+from app.schemas.events import EventEnvelope, NormalizedRequest, NormalizedRequestEvent
+from app.schemas.pubsub import PubSubPushEnvelope
 
 router = APIRouter()
+logger = logging.getLogger("civicbridge.data_intelligence")
+
+
+def _push_error(code: str, message: str, status: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=status,
+        content={
+            "error": {
+                "code": code,
+                "message": message,
+                "retryable": status >= 500,
+            }
+        },
+    )
+
+
+@router.post("/pubsub/request-normalized", tags=["events"], status_code=204)
+def receive_normalized_request_push(request: Request, payload: dict) -> Response:
+    message_id = None
+    event_id = None
+    request_id = None
+    event_version = None
+    try:
+        push = PubSubPushEnvelope.model_validate(payload)
+        message_id = push.message.message_id
+    except ValidationError:
+        logger.warning(
+            "pubsub_push_rejected",
+            extra={
+                "result": "permanent_failure",
+                "error_code": "PUBSUB_ENVELOPE_INVALID",
+            },
+        )
+        return _push_error(
+            "PUBSUB_ENVELOPE_INVALID", "The Pub/Sub push envelope is invalid.", 400
+        )
+    try:
+        decoded = base64.b64decode(push.message.data,validate=True)
+    except (binascii.Error, ValueError):
+        logger.warning(
+            "pubsub_push_rejected",
+            extra={
+                "pubsub_message_id": message_id,
+                "result": "permanent_failure",
+                "error_code": "PUBSUB_DATA_INVALID_BASE64",
+            },
+        )
+        return _push_error(
+            "PUBSUB_DATA_INVALID_BASE64", "message.data is not valid Base64.", 400
+        )
+    try:
+        raw_event = json.loads(decoded)
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+        logger.warning(
+            "pubsub_push_rejected",
+            extra={
+                "pubsub_message_id": message_id,
+                "result": "permanent_failure",
+                "error_code": "PUBSUB_DATA_INVALID_JSON",
+            },
+        )
+        return _push_error(
+            "PUBSUB_DATA_INVALID_JSON",
+            "Decoded message.data is not valid JSON.",
+            400,
+        )
+    try:
+        event = NormalizedRequestEvent.model_validate(raw_event)
+        event_id = str(event.event_id)
+        request_id = str(event.data.request_id)
+        event_version = event.schema_version
+    except ValidationError:
+        logger.warning(
+            "pubsub_push_rejected",
+            extra={
+                "pubsub_message_id": message_id,
+                "result": "permanent_failure",
+                "error_code": "NORMALIZED_REQUEST_INVALID",
+            },
+        )
+        return _push_error(
+            "NORMALIZED_REQUEST_INVALID",
+            "Decoded event does not match request.normalized.v1.",
+            400,
+        )
+
+    context = {
+        "pubsub_message_id": message_id,
+        "event_id": event_id,
+        "event_type": event.event_type,
+        "request_id": request_id,
+        "event_version": event_version,
+    }
+    try:
+        claim = request.app.state.delivery_idempotency.begin(
+            event_id, event.event_type, request_id, event_version
+        )
+    except DomainError as exc:
+        logger.warning("pubsub_push_idempotency_failed", extra={**context, "result": "retryable_failure", "error_code": exc.code})
+        return _push_error(exc.code, "Delivery idempotency is temporarily unavailable.", 503)
+    if claim.duplicate:
+        logger.info("pubsub_push_processed", extra={**context, "result": "success", "duplicate_delivery": True})
+        return Response(status_code=204)
+    if not claim.acquired:
+        logger.warning("pubsub_push_processing_in_progress", extra={**context, "result": "retryable_failure", "error_code": "EVENT_ALREADY_PROCESSING"})
+        return _push_error("EVENT_ALREADY_PROCESSING", "The event is already being processed.", 503)
+    try:
+        result = request.app.state.consumer.handle_event(event)
+    except DomainError as exc:
+        request.app.state.delivery_idempotency.fail(event_id, exc.code)
+        status = 503 if exc.retryable else 400
+        logger.warning(
+            "pubsub_push_processing_failed",
+            extra={
+                **context,
+                "result": (
+                    "retryable_failure" if exc.retryable else "permanent_failure"
+                ),
+                "error_code": exc.code,
+                "duplicate_delivery": False,
+            },
+        )
+        return _push_error(
+            exc.code, "Normalized request processing failed.", status
+        )
+    except Exception:
+        request.app.state.delivery_idempotency.fail(event_id, "INTERNAL_PROCESSING_FAILURE")
+        logger.exception(
+            "pubsub_push_processing_failed",
+            extra={
+                **context,
+                "result": "transient_failure",
+                "error_code": "INTERNAL_PROCESSING_FAILURE",
+                "duplicate_delivery": False,
+            },
+        )
+        return _push_error(
+            "INTERNAL_PROCESSING_FAILURE",
+            "Normalized request processing is temporarily unavailable.",
+            500,
+        )
+
+    request.app.state.delivery_idempotency.complete(event_id)
+    duplicate = bool(result.get("idempotent_replay", False))
+    logger.info(
+        "pubsub_push_processed",
+        extra={
+            **context,
+            "result": "success",
+            "duplicate_delivery": duplicate,
+        },
+    )
+    return Response(status_code=204)
 
 
 @router.post("/internal/v1/intelligence/requests/{request_id}/process", tags=["internal"])

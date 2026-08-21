@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 
 
 class JsonFormatter(logging.Formatter):
-    SAFE_FIELDS = ("trace_id","event_id","request_id","cluster_id","hotspot_id","processing_stage","duration_ms","result","error_code",
-                   "similarity_provider","embedding_model","degraded")
+    SAFE_FIELDS = ("trace_id","event_id","event_type","request_id","cluster_id","hotspot_id","processing_stage","duration_ms","result","error_code",
+                   "similarity_provider","embedding_model","degraded","pubsub_message_id","event_version","duplicate_delivery")
 
     def __init__(self, environment: str) -> None:
         super().__init__()
