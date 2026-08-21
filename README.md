@@ -3,6 +3,30 @@
 > **BRICS Innovation Theme:** AI for Digital Public Infrastructure & Governance  
 > **Subtitle:** From multilingual citizen voices to ranked, evidence-backed infrastructure projects.
 
+## Deployed backend (Google Cloud)
+
+The private Cloud Run pipeline in project `civicbridge-1`, region `us-central1`, is:
+
+`civicbridge-citizen-channels` → `request-created-v1` / `request-confirmed-v1` → `civicbridge-ai-normalization` → `request-normalized-v1` → `civicbridge-data-intelligence` → `hotspot-updated-v1` → `civicbridge-policy-impact`.
+
+Pub/Sub pushes use OIDC as `civicbridge-pubsub-push@civicbridge-1.iam.gserviceaccount.com`. Each target grants that identity `roles/run.invoker`; services remain unavailable to anonymous callers. Runtime identities are `civicbridge-citizen-channels`, `civicbridge-ai-normalization`, `civicbridge-data-intel`, and `civicbridge-policy-impact` in the same project.
+
+Push endpoints are:
+
+- AI Normalization: `POST /pubsub/citizen-events`
+- Data Intelligence: `POST /pubsub/request-normalized`
+- Policy + Impact: `POST /pubsub/hotspot-updated`
+
+Required APIs are Cloud Run, Cloud Build, Artifact Registry, Pub/Sub, Cloud Logging, Vertex AI, BigQuery, BigQuery Storage, Cloud Storage, Speech-to-Text, and Translation. Text-to-Speech, Firestore, Maps, and Secret Manager are not required by the current backend paths.
+
+For local operation, keep every event bus in `memory`, every idempotency backend in `local`, and mocks enabled. Start services from the repository root so `packages/` is importable. Local ADC for gated Google tests is configured with `gcloud auth application-default login`; Cloud Run uses attached service accounts, never downloaded JSON keys.
+
+The three service Dockerfiles build from the repository root using their adjacent `cloudbuild.yaml`. Deploy images privately with `gcloud run deploy SERVICE --region us-central1 --no-allow-unauthenticated --service-account RUNTIME_SA --image IMAGE` and configure Pub/Sub push subscriptions with `--push-auth-service-account` and an audience equal to the target service URL.
+
+For an end-to-end smoke test, obtain a caller identity token, submit a synthetic request to Citizen Channels, then verify the three delivery-ledger tables and safe Cloud Logging entries. Re-publishing the identical event ID must return 204 without a second processing result. Do not use real citizen submissions for smoke tests.
+
+Production durability is intentionally partial: AI/Policy input delivery ledgers and Data Intelligence input/embedding records are in BigQuery, while Citizen request/media state, AI normalization cache, Policy recommendations, and Data Intelligence clusters/hotspots/evidence/outbox still use process memory, local files, or SQLite. Cloud Run filesystems are ephemeral. BigQuery is appropriate for analytical snapshots but not a replacement for transactional operational state; Cloud SQL or another transactional store needs separate approval. The temporary `hotspot-updated-v1-debug` subscription may remain for testing and should be deleted only after confirmation.
+
 ---
 
 ## 1. Executive Summary & Core Pitch
