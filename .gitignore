@@ -1,27 +1,35 @@
 # Virtual Environment
-venv/
 .venv/
+venv/
+ENV/
 env/
 
-# Python Cache
+# Python cache & test artifacts
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.coverage
+htmlcov/
 
-# Environment Variables & Secrets
-.env
-.env.local
-service-account*.json
-credentials.json
-
-# Local Media & Temp Data
+# Local databases, media, and logs
+*.db
+*.sqlite3
+policy_impact.db
+*.log
 data/media/*
 !data/media/.gitkeep
 data/raw/*
 !data/raw/.gitkeep
 
-# IDE / OS Artifacts
+# Environment configuration & secrets
+.env
+.env.*
+.env.local
+service-account*.json
+credentials.json
+
+# OS & IDE local files
 .DS_Store
 Thumbs.db
 .vscode/

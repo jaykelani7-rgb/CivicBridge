@@ -1,0 +1,60 @@
+{
+  "country_code": "BR",
+  "city": "Rio de Janeiro",
+  "geography_id": "BR-RJ-RIO-ZONA-NORTE",
+  "hotspot": {
+    "hotspot_id": "81f93847-321a-4e2b-98ee-123456789abc",
+    "country_code": "BR",
+    "geography_id": "BR-RJ-RIO-ZONA-NORTE",
+    "category": "sanitation",
+    "request_count": 45,
+    "unique_request_count": 34,
+    "affected_population": 28900,
+    "trend_30d": 0.31,
+    "need_score": 82.1,
+    "action_score": 76.5,
+    "evidence_confidence": 0.89,
+    "score_version": "priority-1.0.0",
+    "evidence_bundle_id": "evb_02BR_RIO_SANI",
+    "calculated_at": "2026-08-20T10:32:00Z"
+  },
+  "evidence_bundle": {
+    "evidence_bundle_id": "evb_02BR_RIO_SANI",
+    "hotspot_id": "81f93847-321a-4e2b-98ee-123456789abc",
+    "valid_evidence_ids": [
+      "src_rio_pop_2025",
+      "cluster_rio_sanitation_01",
+      "src_rio_sanitation_gap"
+    ],
+    "summary": "Zona Norte sewage system backup and sanitation network demand hotspot.",
+    "citizen_summaries": [
+      "Esgoto a céu aberto na rua principal durante períodos de chuva.",
+      "Rede de saneamento básico entupida e vazando em área residencial."
+    ],
+    "demographic_indicators": {
+      "affected_population": 28900,
+      "source_id": "src_rio_pop_2025"
+    },
+    "infrastructure_gap": {
+      "gap_score": 88.0,
+      "source_id": "src_rio_sanitation_gap"
+    }
+  },
+  "recommendation_seed": {
+    "recommendation_id": "77a11223-9000-488b-a123-brrio0001234",
+    "hotspot_id": "81f93847-321a-4e2b-98ee-123456789abc",
+    "evidence_bundle_id": "evb_02BR_RIO_SANI",
+    "title": "Rio Zona Norte sanitation pipeline expansion",
+    "problem": "Uncovered sewage overflow threatening public health in Zona Norte residential block.",
+    "proposed_intervention": "Upgrade underground sewage conduits and connect 4,500 households to municipal treatment.",
+    "intended_beneficiaries": 28900,
+    "supporting_evidence_ids": ["src_rio_pop_2025", "cluster_rio_sanitation_01"],
+    "risks": ["Dense informal settlement terrain requires custom trenching equipment."],
+    "missing_information": ["Sub-surface utility mapping"],
+    "confidence": 0.85,
+    "status": "under_review",
+    "ai_draft": true,
+    "human_approved": false,
+    "schema_version": "recommendation-1.0.0"
+  }
+}

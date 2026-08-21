@@ -1,0 +1,60 @@
+{
+  "country_code": "ZA",
+  "city": "Cape Town",
+  "geography_id": "ZA-WC-CPT-W15",
+  "hotspot": {
+    "hotspot_id": "99e82110-4411-4999-88aa-za0011223344",
+    "country_code": "ZA",
+    "geography_id": "ZA-WC-CPT-W15",
+    "category": "electricity",
+    "request_count": 52,
+    "unique_request_count": 41,
+    "affected_population": 18200,
+    "trend_30d": 0.35,
+    "need_score": 85.3,
+    "action_score": 79.2,
+    "evidence_confidence": 0.88,
+    "score_version": "priority-1.0.0",
+    "evidence_bundle_id": "evb_03ZA_CPT_ELEC",
+    "calculated_at": "2026-08-20T10:32:00Z"
+  },
+  "evidence_bundle": {
+    "evidence_bundle_id": "evb_03ZA_CPT_ELEC",
+    "hotspot_id": "99e82110-4411-4999-88aa-za0011223344",
+    "valid_evidence_ids": [
+      "src_cpt_pop_w15",
+      "cluster_cpt_elec_w15",
+      "src_cpt_grid_gap"
+    ],
+    "summary": "Ward 15 Cape Town street lighting and distribution grid reliability hotspot.",
+    "citizen_summaries": [
+      "Frequent night outages on Ward 15 main corridor causing safety concerns.",
+      "Transformer overload causing daily power drops for community facility."
+    ],
+    "demographic_indicators": {
+      "affected_population": 18200,
+      "source_id": "src_cpt_pop_w15"
+    },
+    "infrastructure_gap": {
+      "gap_score": 89.2,
+      "source_id": "src_cpt_grid_gap"
+    }
+  },
+  "recommendation_seed": {
+    "recommendation_id": "99b87654-1111-4567-9999-zacpt0009876",
+    "hotspot_id": "99e82110-4411-4999-88aa-za0011223344",
+    "evidence_bundle_id": "evb_03ZA_CPT_ELEC",
+    "title": "Cape Town Ward 15 public lighting and mini-substation upgrade",
+    "problem": "Unreliable distribution infrastructure and dark transit corridors impacting safety.",
+    "proposed_intervention": "Install solar-augmented LED streetlights and upgrade mini-substation transformer capacity.",
+    "intended_beneficiaries": 18200,
+    "supporting_evidence_ids": ["src_cpt_pop_w15", "cluster_cpt_elec_w15"],
+    "risks": ["Vandalism protection required for solar battery enclosures."],
+    "missing_information": ["High-voltage cable inspection log"],
+    "confidence": 0.86,
+    "status": "under_review",
+    "ai_draft": true,
+    "human_approved": false,
+    "schema_version": "recommendation-1.0.0"
+  }
+}
