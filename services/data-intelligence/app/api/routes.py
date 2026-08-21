@@ -96,5 +96,8 @@ def health(request: Request) -> dict:
         "operational_repository":"sqlite",
         "analytical_repository":type(request.app.state.primary_analytical_repository).__name__,
         "geography_provider":type(request.app.state.primary_geography_provider).__name__,
+        "similarity_provider":request.app.state.similarity_service.metadata.provider,
+        "embedding_model":request.app.state.similarity_service.metadata.model,
+        "embedding_dimension":request.app.state.similarity_service.metadata.dimension,
         "local_fallback_enabled":request.app.state.settings.allow_local_fallback,
         "current_score_version":request.app.state.settings.score_version}

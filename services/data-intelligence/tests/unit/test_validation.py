@@ -52,3 +52,22 @@ def test_invalid_bigquery_identifier_is_rejected():
     with pytest.raises(ValueError,match="invalid identifier"):
         Settings.from_env({"CB_MODE":"google","CB_BIGQUERY_PROJECT":"unsafe.project;drop",
                            "CB_BIGQUERY_DATASET":"intelligence"})
+
+
+def test_vertex_configuration_is_environment_backed_and_validated():
+    settings = Settings.from_env({
+        "SIMILARITY_PROVIDER":"vertex", "GOOGLE_CLOUD_PROJECT":"civic-project",
+        "GOOGLE_CLOUD_LOCATION":"us-central1", "VERTEX_EMBEDDING_MODEL":"gemini-embedding-001",
+        "EMBEDDING_DIMENSION":"768", "DUPLICATE_SIMILARITY_THRESHOLD":"0.88",
+        "RELATED_SIMILARITY_THRESHOLD":"0.78",
+    })
+    assert settings.similarity_provider == "vertex"
+    assert settings.google_cloud_project == "civic-project"
+    assert settings.embedding_dimension == 768
+
+
+def test_vertex_project_and_similarity_threshold_errors_are_actionable():
+    with pytest.raises(ValueError, match="GOOGLE_CLOUD_PROJECT"):
+        Settings.from_env({"SIMILARITY_PROVIDER":"vertex"})
+    with pytest.raises(ValueError, match="similarity thresholds"):
+        Settings.from_env({"RELATED_SIMILARITY_THRESHOLD":"0.9", "DUPLICATE_SIMILARITY_THRESHOLD":"0.8"})

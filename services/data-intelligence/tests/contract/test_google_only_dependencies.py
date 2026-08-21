@@ -18,6 +18,7 @@ def test_production_cloud_dependencies_are_google_cloud_sdks():
     pyproject = (SERVICE_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "google-cloud-bigquery" in pyproject
     assert "google-cloud-pubsub" in pyproject
+    assert "google-genai" in pyproject
 
 
 def test_local_configuration_contains_no_credentials_and_google_mode_is_explicit():

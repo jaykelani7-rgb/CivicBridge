@@ -10,7 +10,7 @@ from app.repositories.sqlite import SQLiteRepository
 def main() -> None:
     settings=Settings.from_env()
     service_dir=Path(__file__).resolve().parents[3]
-    repository=SQLiteRepository(settings.database_path,service_dir/"migrations"/"001_initial.sql")
+    repository=SQLiteRepository(settings.database_path,service_dir/"migrations")
     try:
         print(load_fixtures(repository,settings.resolved_fixture_dir(),settings.country_packs))
     finally:

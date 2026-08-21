@@ -33,6 +33,61 @@ class DuplicateCandidate:
     time_difference_days: float
     match_reason: str
     suggested_action: str
+    similarity_classification: str
+    similarity_provider: str
+    embedding_model: str
+    embedding_dimension: int
+    canonical_text_version: str
+    degraded_similarity: bool
+
+
+@dataclass(frozen=True)
+class CanonicalDocument:
+    request_id: str
+    text: str
+    version: str = "v1"
+
+
+@dataclass(frozen=True)
+class ProviderMetadata:
+    provider: str
+    model: str
+    dimension: int
+    canonical_text_version: str = "v1"
+
+
+@dataclass(frozen=True)
+class EmbeddingRecord:
+    request_id: str
+    content_hash: str
+    embedding: list[float]
+    embedding_model: str
+    embedding_dimension: int
+    canonical_text_version: str
+    provider: str
+    created_at: str
+    canonical_text: str = field(default="", repr=False, compare=False)
+
+
+@dataclass(frozen=True)
+class SimilarityMeasurement:
+    score: float
+    classification: str
+    provider: str
+    model: str
+    dimension: int
+    canonical_text_version: str
+    degraded: bool
+
+
+@dataclass(frozen=True)
+class SimilarityBatchResult:
+    measurements: dict[str, SimilarityMeasurement]
+    provider: str
+    model: str
+    dimension: int
+    canonical_text_version: str
+    degraded: bool
 
 
 @dataclass(frozen=True)

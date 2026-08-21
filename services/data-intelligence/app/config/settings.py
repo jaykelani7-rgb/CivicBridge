@@ -41,6 +41,16 @@ class Settings:
     pubsub_project: Optional[str] = None
     pubsub_topic: str = "hotspot-updated-v1"
     pubsub_subscription: str = "request-normalized-v1-data-intelligence"
+    similarity_provider: str = "lexical"
+    google_cloud_project: Optional[str] = None
+    google_cloud_location: str = "us-central1"
+    vertex_embedding_model: str = "gemini-embedding-001"
+    embedding_dimension: int = 768
+    duplicate_similarity_threshold: float = 0.88
+    related_similarity_threshold: float = 0.78
+    vertex_timeout_seconds: float = 30.0
+    vertex_max_retries: int = 3
+    vertex_batch_size: int = 20
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -78,6 +88,16 @@ class Settings:
             pubsub_project=source.get("CB_PUBSUB_PROJECT") or None,
             pubsub_topic=_env(source, "CB_PUBSUB_TOPIC", "hotspot-updated-v1"),
             pubsub_subscription=_env(source, "CB_PUBSUB_SUBSCRIPTION", "request-normalized-v1-data-intelligence"),
+            similarity_provider=_env(source, "SIMILARITY_PROVIDER", "lexical").lower(),
+            google_cloud_project=source.get("GOOGLE_CLOUD_PROJECT") or None,
+            google_cloud_location=_env(source, "GOOGLE_CLOUD_LOCATION", "us-central1"),
+            vertex_embedding_model=_env(source, "VERTEX_EMBEDDING_MODEL", "gemini-embedding-001"),
+            embedding_dimension=int(_env(source, "EMBEDDING_DIMENSION", "768")),
+            duplicate_similarity_threshold=float(_env(source, "DUPLICATE_SIMILARITY_THRESHOLD", "0.88")),
+            related_similarity_threshold=float(_env(source, "RELATED_SIMILARITY_THRESHOLD", "0.78")),
+            vertex_timeout_seconds=float(_env(source, "VERTEX_EMBEDDING_TIMEOUT_SECONDS", "30")),
+            vertex_max_retries=int(_env(source, "VERTEX_EMBEDDING_MAX_RETRIES", "3")),
+            vertex_batch_size=int(_env(source, "VERTEX_EMBEDDING_BATCH_SIZE", "20")),
         )
         settings.validate()
         return settings
@@ -95,6 +115,25 @@ class Settings:
             raise ValueError("CB_GEOGRAPHY_PROVIDER must be local or bigquery")
         if self.event_bus not in {"memory", "pubsub"}:
             raise ValueError("CB_EVENT_BUS must be memory or pubsub")
+        if self.similarity_provider not in {"lexical", "vertex"}:
+            raise ValueError("SIMILARITY_PROVIDER must be lexical or vertex")
+        if not 0 <= self.related_similarity_threshold < self.duplicate_similarity_threshold <= 1:
+            raise ValueError("similarity thresholds must satisfy 0 <= related < duplicate <= 1")
+        if self.embedding_dimension < 1:
+            raise ValueError("EMBEDDING_DIMENSION must be positive")
+        if self.vertex_timeout_seconds <= 0:
+            raise ValueError("VERTEX_EMBEDDING_TIMEOUT_SECONDS must be positive")
+        if not 0 <= self.vertex_max_retries <= 10:
+            raise ValueError("VERTEX_EMBEDDING_MAX_RETRIES must be between 0 and 10")
+        if not 1 <= self.vertex_batch_size <= 100:
+            raise ValueError("VERTEX_EMBEDDING_BATCH_SIZE must be between 1 and 100")
+        if self.similarity_provider == "vertex":
+            if not self.google_cloud_project:
+                raise ValueError("GOOGLE_CLOUD_PROJECT is required when SIMILARITY_PROVIDER=vertex")
+            if not self.google_cloud_location:
+                raise ValueError("GOOGLE_CLOUD_LOCATION is required when SIMILARITY_PROVIDER=vertex")
+            if not self.vertex_embedding_model:
+                raise ValueError("VERTEX_EMBEDDING_MODEL is required when SIMILARITY_PROVIDER=vertex")
         if not 0 <= self.duplicate_review_threshold < self.duplicate_high_threshold <= 1:
             raise ValueError("duplicate thresholds must satisfy 0 <= review < high <= 1")
         if self.default_page_size < 1 or self.max_page_size < self.default_page_size:

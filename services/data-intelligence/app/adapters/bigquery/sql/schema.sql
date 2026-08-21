@@ -40,3 +40,9 @@ CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.{{DATASET}}.ingestion_runs` (
   snapshot_id STRING NOT NULL,dataset_id STRING NOT NULL,dataset_version STRING NOT NULL,status STRING NOT NULL,
   error_code STRING,created_at TIMESTAMP NOT NULL,updated_at TIMESTAMP NOT NULL
 ) CLUSTER BY dataset_id,status;
+
+CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.{{DATASET}}.request_embeddings` (
+  request_id STRING NOT NULL,content_hash STRING NOT NULL,embedding ARRAY<FLOAT64> NOT NULL,
+  embedding_model STRING NOT NULL,embedding_dimension INT64 NOT NULL,canonical_text_version STRING NOT NULL,
+  provider STRING NOT NULL,created_at TIMESTAMP NOT NULL
+) CLUSTER BY content_hash,embedding_model,provider;

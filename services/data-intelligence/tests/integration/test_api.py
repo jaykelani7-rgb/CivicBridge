@@ -93,3 +93,28 @@ def test_health_reports_dependency_state(client,app):
     health=client.get("/health").json()
     assert health["status"] == "degraded"
     assert health["event_bus_connectivity"] is False
+
+
+def test_pipeline_continues_and_identifies_lexical_fallback(client, app):
+    from app.adapters.similarity.lexical import LexicalSimilarityProvider
+    from app.domain.errors import TransientSimilarityProviderError
+    from app.domain.models import ProviderMetadata
+    from app.services.similarity import CachedSimilarityService
+
+    class FailingVertex:
+        metadata = ProviderMetadata("vertex", "gemini-embedding-001", 768, "v1")
+        def embed_many(self, documents):
+            raise TransientSimilarityProviderError("temporary")
+        def similarity(self, left, right):
+            raise AssertionError("not reached")
+
+    app.state.pipeline.duplicate_detector.similarity_service = CachedSimilarityService(
+        app.state.repository, FailingVertex(), LexicalSimilarityProvider(768), 0.88, 0.78
+    )
+    response = _process(client)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["processing_status"] == "completed"
+    assert result["similarity_processing"]["provider"] == "lexical"
+    assert result["similarity_processing"]["degraded"] is True
+    assert result["duplicate_candidates"][0]["degraded_similarity"] is True

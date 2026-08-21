@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional, Protocol, runtime_checkable
 
 from app.domain.errors import DependencyError, DomainError
-from app.domain.models import Geography
+from app.domain.models import CanonicalDocument, EmbeddingRecord, Geography, ProviderMetadata
 
 
 @runtime_checkable
@@ -23,6 +23,15 @@ class GeographyProvider(Protocol):
         administrative_id: Optional[str],
         location_mentions: list[str],
     ) -> Geography: ...
+
+
+@runtime_checkable
+class SimilarityProvider(Protocol):
+    @property
+    def metadata(self) -> ProviderMetadata: ...
+    def embed_one(self, document: CanonicalDocument) -> EmbeddingRecord: ...
+    def embed_many(self, documents: list[CanonicalDocument]) -> list[EmbeddingRecord]: ...
+    def similarity(self, left: EmbeddingRecord, right: EmbeddingRecord) -> float: ...
 
 
 class FallbackAnalyticalRepository:
@@ -81,3 +90,27 @@ class FallbackGeographyProvider:
             administrative_id=administrative_id,
             location_mentions=location_mentions,
         )
+
+
+class FallbackEmbeddingRepository:
+    """Prefer the durable BigQuery cache while retaining local continuity."""
+
+    def __init__(self, primary: Any, fallback: Any) -> None:
+        self.primary = primary
+        self.fallback = fallback
+
+    def get_embedding(self, digest: str) -> Optional[dict[str, Any]]:
+        try:
+            record = self.primary.get_embedding(digest)
+            if record:
+                return record
+        except DependencyError:
+            pass
+        return self.fallback.get_embedding(digest)
+
+    def save_embedding(self, record: EmbeddingRecord) -> None:
+        try:
+            self.primary.save_embedding(record)
+        except DependencyError:
+            pass
+        self.fallback.save_embedding(record)

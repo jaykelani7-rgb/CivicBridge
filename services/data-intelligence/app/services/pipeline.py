@@ -97,7 +97,7 @@ class IntelligencePipeline:
                             "evidence_bundle_id":None,"trace_id":trace_id,"warnings":[exc.message]}
 
                 with self.stage("find_duplicates",context):
-                    candidates = self.duplicate_detector.find(request,geography,envelope.occurred_at)
+                    candidates, similarity = self.duplicate_detector.find_with_metadata(request,geography,envelope.occurred_at)
                     stored_candidates = [self.duplicate_detector.stored(x,str(request.request_id)) for x in candidates]
                     self.repository.save_duplicate_candidates(str(request.request_id),stored_candidates,utc_now())
                     if any(x.suggested_action == "manual_review" for x in candidates):
@@ -113,7 +113,8 @@ class IntelligencePipeline:
                         self.repository.create_cluster({"cluster_id":cluster_id,"country_code":request.country_code,
                             "geography_id":geography.geography_id,"spatial_cell":geography.spatial_cell,"category":request.category,
                             "subcategory":request.subcategory,"canonical_summary":request.summary,"first_seen":self._iso(envelope.occurred_at),
-                            "last_seen":self._iso(envelope.occurred_at),"duplicate_method":"explainable-local-v1",
+                            "last_seen":self._iso(envelope.occurred_at),
+                            "duplicate_method":f"explainable-{similarity.provider}-v1",
                             "centroid_lat":geography.latitude,"centroid_lon":geography.longitude})
                     self.repository.add_cluster_member({"request_id":str(request.request_id),"cluster_id":cluster_id,"event_id":event_id,
                         "summary":request.summary,"requested_outcome":request.requested_outcome,"urgency":request.urgency,
@@ -127,7 +128,13 @@ class IntelligencePipeline:
                 self.metrics.increment("events_processed")
                 response = {"processing_status":"completed","request_id":str(request.request_id),
                     "cluster_assignment":{"cluster_id":cluster_id,"action":assignment},
-                    "duplicate_candidates":[x.__dict__ for x in candidates],"trace_id":trace_id,**result}
+                    "duplicate_candidates":[x.__dict__ for x in candidates],"trace_id":trace_id,
+                    "similarity_processing":{"provider":similarity.provider,"model":similarity.model,
+                        "dimension":similarity.dimension,"canonical_text_version":similarity.canonical_text_version,
+                        "degraded":similarity.degraded},**result}
+                if similarity.degraded:
+                    response["warnings"] = [*response["warnings"],
+                        "Vertex semantic similarity was unavailable; explainable lexical fallback was used."]
             self.outbox.dispatch()
             return response
         except DomainError as exc:

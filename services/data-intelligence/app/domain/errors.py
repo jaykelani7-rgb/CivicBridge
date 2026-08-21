@@ -29,3 +29,23 @@ class NotFoundError(DomainError):
 class DependencyError(DomainError):
     def __init__(self, message: str) -> None:
         super().__init__("DEPENDENCY_UNAVAILABLE", message, retryable=True, http_status=503)
+
+
+class SimilarityProviderError(DomainError):
+    def __init__(self, code: str, message: str, *, retryable: bool) -> None:
+        super().__init__(code, message, retryable=retryable, http_status=503 if retryable else 422)
+
+
+class TransientSimilarityProviderError(SimilarityProviderError):
+    def __init__(self, message: str) -> None:
+        super().__init__("SIMILARITY_PROVIDER_TRANSIENT", message, retryable=True)
+
+
+class PermanentSimilarityProviderError(SimilarityProviderError):
+    def __init__(self, message: str) -> None:
+        super().__init__("SIMILARITY_PROVIDER_PERMANENT", message, retryable=False)
+
+
+class InvalidEmbeddingError(SimilarityProviderError):
+    def __init__(self, message: str) -> None:
+        super().__init__("EMBEDDING_INVALID", message, retryable=False)

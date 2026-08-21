@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
+from app.domain.models import EmbeddingRecord
+
 
 class SQLiteRepository:
     """Operational local/demo store with an atomic pipeline and outbox."""
@@ -17,7 +19,21 @@ class SQLiteRepository:
         self.connection = sqlite3.connect(database_path, check_same_thread=False, isolation_level=None)
         self.connection.row_factory = sqlite3.Row
         self._lock = threading.RLock()
-        self.connection.executescript(migration_path.read_text(encoding="utf-8"))
+        self._run_migrations(migration_path)
+
+    def _run_migrations(self, migration_path: Path) -> None:
+        self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+        )
+        paths = [migration_path] if migration_path.is_file() else sorted(migration_path.glob("[0-9][0-9][0-9]_*.sql"))
+        for path in paths:
+            applied = self.connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version=?", (path.name,)
+            ).fetchone()
+            if applied:
+                continue
+            self.connection.executescript(path.read_text(encoding="utf-8"))
+            self.connection.execute("INSERT INTO schema_migrations(version) VALUES(?)", (path.name,))
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -200,12 +216,36 @@ class SQLiteRepository:
     def save_duplicate_candidates(self, request_id: str, candidates: list[dict[str, Any]], now: str) -> None:
         for candidate in candidates:
             self.connection.execute(
-                "INSERT OR REPLACE INTO duplicate_candidates VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO duplicate_candidates "
+                "(id,request_id,candidate_request_id,candidate_cluster_id,final_similarity,semantic_similarity,"
+                "spatial_similarity,temporal_similarity,taxonomy_similarity,distance_km,time_difference_days,"
+                "match_reason,suggested_action,created_at,similarity_classification,similarity_provider,embedding_model,"
+                "embedding_dimension,canonical_text_version,degraded_similarity) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (candidate["id"], request_id, candidate["candidate_request_id"], candidate["candidate_cluster_id"],
                  candidate["final_similarity"], candidate["semantic_similarity"], candidate["spatial_similarity"],
                  candidate["temporal_similarity"], candidate["taxonomy_similarity"], candidate["distance_km"],
-                 candidate["time_difference_days"], candidate["match_reason"], candidate["suggested_action"], now),
+                 candidate["time_difference_days"], candidate["match_reason"], candidate["suggested_action"], now,
+                 candidate["similarity_classification"], candidate["similarity_provider"], candidate["embedding_model"],
+                 candidate["embedding_dimension"], candidate["canonical_text_version"], int(candidate["degraded_similarity"])),
             )
+
+    def get_embedding(self, digest: str) -> Optional[dict[str, Any]]:
+        row = self._dict(self.connection.execute(
+            "SELECT * FROM request_embeddings WHERE content_hash=?", (digest,)
+        ).fetchone())
+        if row:
+            row["embedding"] = json.loads(row.pop("embedding_json"))
+            row["embedding_dimension"] = int(row["embedding_dimension"])
+        return row
+
+    def save_embedding(self, record: EmbeddingRecord) -> None:
+        self.connection.execute(
+            "INSERT OR IGNORE INTO request_embeddings "
+            "(content_hash,request_id,embedding_json,embedding_model,embedding_dimension,canonical_text_version,provider,created_at) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (record.content_hash,record.request_id,json.dumps(record.embedding,separators=(",",":")),
+             record.embedding_model,record.embedding_dimension,record.canonical_text_version,record.provider,record.created_at),
+        )
 
     def get_cluster_members(self, cluster_id: str) -> list[dict[str, Any]]:
         return [dict(x) for x in self.connection.execute(

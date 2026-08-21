@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any, Optional
 
 from app.domain.errors import DependencyError
+from app.domain.models import EmbeddingRecord
 
 
 def _safe_value(value: Any) -> Any:
@@ -110,3 +111,52 @@ class BigQueryAnalyticalRepository:
             "projects":projects,
             "sources":sources,
         }
+
+    def get_embedding(self, digest: str) -> Optional[dict[str, Any]]:
+        query = f"""
+            SELECT request_id,content_hash,embedding,embedding_model,embedding_dimension,
+                   canonical_text_version,provider,created_at
+            FROM `{self.dataset}.request_embeddings`
+            WHERE content_hash=@content_hash
+            LIMIT 1
+        """
+        config = self.bigquery.QueryJobConfig(query_parameters=[
+            self.bigquery.ScalarQueryParameter("content_hash","STRING",digest)
+        ])
+        try:
+            rows = list(self.client.query(query,job_config=config,location=self.location).result())
+            if not rows:
+                return None
+            record = {key:_safe_value(value) for key,value in dict(rows[0]).items()}
+            record["embedding"] = [float(value) for value in record["embedding"]]
+            record["embedding_dimension"] = int(record["embedding_dimension"])
+            return record
+        except Exception as exc:
+            raise DependencyError("BigQuery embedding cache lookup failed.") from exc
+
+    def save_embedding(self, record: EmbeddingRecord) -> None:
+        query = f"""
+            MERGE `{self.dataset}.request_embeddings` target
+            USING (SELECT @content_hash AS content_hash) source
+            ON target.content_hash=source.content_hash
+            WHEN NOT MATCHED THEN INSERT
+              (request_id,content_hash,embedding,embedding_model,embedding_dimension,
+               canonical_text_version,provider,created_at)
+            VALUES
+              (@request_id,@content_hash,@embedding,@embedding_model,@embedding_dimension,
+               @canonical_text_version,@provider,TIMESTAMP(@created_at))
+        """
+        config = self.bigquery.QueryJobConfig(query_parameters=[
+            self.bigquery.ScalarQueryParameter("request_id","STRING",record.request_id),
+            self.bigquery.ScalarQueryParameter("content_hash","STRING",record.content_hash),
+            self.bigquery.ArrayQueryParameter("embedding","FLOAT64",record.embedding),
+            self.bigquery.ScalarQueryParameter("embedding_model","STRING",record.embedding_model),
+            self.bigquery.ScalarQueryParameter("embedding_dimension","INT64",record.embedding_dimension),
+            self.bigquery.ScalarQueryParameter("canonical_text_version","STRING",record.canonical_text_version),
+            self.bigquery.ScalarQueryParameter("provider","STRING",record.provider),
+            self.bigquery.ScalarQueryParameter("created_at","STRING",record.created_at),
+        ])
+        try:
+            self.client.query(query,job_config=config,location=self.location).result()
+        except Exception as exc:
+            raise DependencyError("BigQuery embedding cache write failed.") from exc

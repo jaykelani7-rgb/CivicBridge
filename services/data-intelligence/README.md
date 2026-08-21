@@ -60,6 +60,7 @@ cd services/data-intelligence
 python3 -m venv .venv
 .venv/bin/python -m pip install '.[test]'
 cp .env.example .env
+# For credential-free local mode, set SIMILARITY_PROVIDER=lexical in .env.
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --env-file .env
 ```
 
@@ -136,6 +137,32 @@ Sharmad should consume `hotspot.updated.v1`, deduplicate by `event_id`, use `evi
 
 ## Duplicate detection
 
+### Vertex AI semantic embeddings
+
+Duplicate similarity is selected through a `SimilarityProvider` port. `VertexEmbeddingProvider` uses the official
+`google-genai` SDK with Vertex AI, `gemini-embedding-001`, the stable `v1` API, 768 output dimensions, deterministic
+batch splitting, request timeouts, and bounded transient-only retry backoff. `LexicalSimilarityProvider` remains an
+independently usable, credential-free implementation and is the explicit degraded fallback.
+
+Canonical embedding text has a versioned stable field order: country, approximate administrative area, category,
+subcategory, normalized summary, problem description, and requested outcome. Missing fields are omitted, whitespace
+is normalized, direct contact details are redacted, and request IDs, timestamps, exact addresses, authentication IDs,
+and messaging IDs are excluded. The SHA-256 cache key includes canonical text, canonical version, model, and dimension.
+SQLite stores cached embedding records in local mode; Google mode uses the existing BigQuery analytical repository's
+`request_embeddings` table with SQLite continuity fallback. Both persist provider/model/version metadata associated
+with each similarity result, so unchanged content is not sent to Vertex again. No BigQuery vector index is created for
+the current hackathon-sized candidate set; candidate filtering remains bounded by country, category, time, and distance.
+
+Semantic cosine scores are classified as `probable_duplicate` at `>= 0.88`, `related_request` at `>= 0.78`, and
+`separate_request` below `0.78`. These initial values require calibration against realistic multilingual CivicBridge
+evaluation data. The existing explainable combined duplicate score, spatial/temporal/taxonomy components, and
+`auto_attach`/`manual_review`/`separate` contract remain unchanged.
+
+If Vertex fails, permanent errors are not retried; transient rate-limit, timeout, network, gateway, or availability
+errors receive bounded retries. A structured warning then records lexical fallback without logging submissions,
+vectors, credentials, or tokens. Processing continues and both the API response and persisted candidate identify the
+provider/model actually used and `degraded_similarity=true`.
+
 Candidate retrieval is restricted to the same country and category, the configured time window, and configured distance. The versioned local method calculates:
 
 ```text
@@ -186,19 +213,41 @@ All values and descriptions are in `.env.example`:
 - Scoring/API: `CB_SCORE_VERSION`, `CB_DEFAULT_PAGE_SIZE`, `CB_MAX_PAGE_SIZE`.
 - BigQuery: `CB_BIGQUERY_PROJECT`, `CB_BIGQUERY_DATASET`, `CB_BIGQUERY_RAW_DATASET`, `CB_BIGQUERY_LOCATION`, `CB_BIGQUERY_S2_LEVEL`.
 - Events: `CB_EVENT_BUS`, `CB_PUBSUB_PROJECT`, `CB_PUBSUB_TOPIC`, `CB_PUBSUB_SUBSCRIPTION`.
+- Similarity: `SIMILARITY_PROVIDER`, `VERTEX_EMBEDDING_MODEL`, `EMBEDDING_DIMENSION`,
+  `DUPLICATE_SIMILARITY_THRESHOLD`, `RELATED_SIMILARITY_THRESHOLD`, timeout/retry/batch limits.
+- Vertex runtime: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `RUN_VERTEX_INTEGRATION_TESTS`.
 
-Production configuration fails at startup if a selected BigQuery or Pub/Sub dependency lacks required identifiers. Install `.[production]` for Google Cloud SDKs. BigQuery reads use named query parameters and GIS uses `ST_CONTAINS(..., ST_GEOGPOINT(...))` against versioned boundaries. The transactional operational store remains separate from analytical BigQuery reads.
+Production configuration fails at startup if a selected BigQuery or Pub/Sub dependency lacks required identifiers. Install `.[production]` for Google Cloud SDKs. BigQuery reads use named query parameters and GIS uses `ST_COVERS(..., ST_GEOGPOINT(...))` against versioned boundaries. The transactional operational store remains separate from analytical BigQuery reads.
+
+Vertex mode also fails startup with an actionable error when project, location, model, dimension, timeout, batch size,
+or thresholds are invalid. Local development authenticates with:
+
+```bash
+gcloud auth application-default login
+```
+
+No Gemini API key or service-account JSON key is required or supported. Cloud Run should use its attached runtime
+service account with `roles/aiplatform.user`; set the environment variables on the Cloud Run service and do not mount
+credential files. For fully offline development, set `SIMILARITY_PROVIDER=lexical`.
 
 ## Tests and Docker
 
 ```bash
 .venv/bin/pytest
 .venv/bin/pytest --cov=app --cov-report=term-missing
+SIMILARITY_PROVIDER=lexical .venv/bin/python -m app.adapters.similarity.smoke
+RUN_VERTEX_INTEGRATION_TESTS=true \
+  GOOGLE_CLOUD_PROJECT=YOUR_PROJECT GOOGLE_CLOUD_LOCATION=us-central1 \
+  SIMILARITY_PROVIDER=vertex .venv/bin/pytest tests/integration/test_vertex_live.py
 docker build -t civicbridge-data-intelligence .
 docker run --rm -p 8080:8080 civicbridge-data-intelligence
 ```
 
 The suite covers schema/contract compatibility, polygon containment, stable cells, distances, explainable duplicate components/thresholds, cluster assignment, event and membership idempotency, every score output and formula, missing-data confidence, evidence hashing and PII masking, fixture provenance/reruns, APIs and pagination, dependency health, mocked BigQuery GIS, output-event consumption, recalculation history, and end-to-end India/Brazil/South Africa flows. No paid credentials are required.
+
+The offline smoke command prints only provider, model, dimension, two scores, degraded status, and the assertion that
+the two water reports are more similar than the road report. The live integration test is skipped unless
+`RUN_VERTEX_INTEGRATION_TESTS=true`; it uses Application Default Credentials and never accepts an API key or key file.
 
 ## Known limitations and integration risks
 
