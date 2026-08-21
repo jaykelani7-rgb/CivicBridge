@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /service
+COPY pyproject.toml README.md ./
+COPY app ./app
+COPY datasets ./datasets
+RUN pip install --no-cache-dir '.[google-data]'
+RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /service
+USER appuser
+ENTRYPOINT ["python","-m","app.adapters.bigquery.ingest"]
+CMD ["--help"]

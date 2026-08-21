@@ -26,6 +26,8 @@ data/raw/*
 .env
 .env.*
 .env.local
+!.env.example
+!**/.env.example
 service-account*.json
 credentials.json
 

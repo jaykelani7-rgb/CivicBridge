@@ -1,0 +1,24 @@
+[
+  {
+    "event_id":"c1000000-0000-4000-8000-000000000001","event_type":"request.normalized.v1","schema_version":"1.0.0",
+    "occurred_at":"2026-08-20T10:30:00Z","producer":"ai-normalization","trace_id":"c1100000-0000-4000-8000-000000000001",
+    "data":{"request_id":"c1200000-0000-4000-8000-000000000001","country_code":"ZA","original_language":"en-ZA",
+      "translation_working":"Repeated water interruptions affect households in Soweto.","category":"water","subcategory":"water_supply",
+      "summary":"Repeated water interruptions affect households in Soweto.","problem_description":"Community water service is unreliable.",
+      "requested_outcome":"Restore a reliable community water supply.","urgency":"high","affected_scope":"community",
+      "location_mentions":["Soweto","Johannesburg"],"evidence_types":["text","repeat_report"],"confidence":0.91,
+      "pii_flags":["none"],"needs_human_review":false,"review_reason":null,"model":"configured-gemini-model",
+      "prompt_version":"normalize-1.0.0","schema_version":"normalized-request-1.0.0","local_language_hint":"zu-ZA"}
+  },
+  {
+    "event_id":"c1000000-0000-4000-8000-000000000002","event_type":"request.normalized.v1","schema_version":"1.0.0",
+    "occurred_at":"2026-08-18T07:00:00Z","producer":"ai-normalization","trace_id":"c1100000-0000-4000-8000-000000000002",
+    "data":{"request_id":"c1200000-0000-4000-8000-000000000002","country_code":"ZA","original_language":"zu-ZA",
+      "translation_working":"Sanitation access is unreliable in Alexandra.","category":"sanitation","subcategory":"sanitation_access",
+      "summary":"Unreliable sanitation access affects residents in Alexandra.","problem_description":"Shared sanitation services are not consistently available.",
+      "requested_outcome":"Provide reliable and safe sanitation access.","urgency":"high","affected_scope":"community",
+      "location_mentions":["Alexandra","Johannesburg"],"evidence_types":["voice"],"confidence":0.86,
+      "pii_flags":["none"],"needs_human_review":false,"review_reason":null,"model":"configured-gemini-model",
+      "prompt_version":"normalize-1.0.0","schema_version":"normalized-request-1.0.0","local_language_hint":"zu-ZA"}
+  }
+]

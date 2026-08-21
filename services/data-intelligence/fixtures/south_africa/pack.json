@@ -1,0 +1,25 @@
+{
+  "country_code": "ZA",
+  "admin_units": [
+    {"geography_id":"ZA-GP-JHB-SOW","admin1":"Gauteng","admin2":"Johannesburg","locality":"Soweto","centroid_lat":-26.2678,"centroid_lon":27.8585,"polygon":[[27.75,-26.36],[27.96,-26.36],[27.96,-26.18],[27.75,-26.18]],"aliases":["soweto","johannesburg","jozi"],"boundary_source":"CivicBridge demo boundary derived from public administrative names","boundary_version":"demo-2026-08"},
+    {"geography_id":"ZA-GP-JHB-ALX","admin1":"Gauteng","admin2":"Johannesburg","locality":"Alexandra","centroid_lat":-26.105,"centroid_lon":28.10,"polygon":[[28.06,-26.14],[28.14,-26.14],[28.14,-26.07],[28.06,-26.07]],"aliases":["alexandra","alex","johannesburg"],"boundary_source":"CivicBridge demo boundary derived from public administrative names","boundary_version":"demo-2026-08"}
+  ],
+  "sources": [
+    {"source_id":"src_za_demo_access_2025","publisher":"CivicBridge Hackathon Fixture Team","dataset_title":"Johannesburg service-access and equity indicators (synthetic demo fixture)","geographic_coverage":"Johannesburg demo areas","time_coverage":"2025","retrieved_at":"2026-08-20","license":"CC BY 4.0 for fixture code","transformation_notes":"Synthetic normalized values for offline tests; not official statistics. Request language metadata may be en-ZA, zu-ZA, or st-ZA.","confidence":0.70,"freshness_status":"current","synthetic":true},
+    {"source_id":"src_za_demo_plan_2026","publisher":"CivicBridge Hackathon Fixture Team","dataset_title":"Johannesburg service investment examples (synthetic demo fixture)","geographic_coverage":"Johannesburg demo areas","time_coverage":"2026","retrieved_at":"2026-08-20","license":"CC BY 4.0 for fixture code","transformation_notes":"Synthetic plan record.","confidence":0.65,"freshness_status":"current","synthetic":true}
+  ],
+  "demographics": [
+    {"feature_id":"dem_za_sow","geography_id":"ZA-GP-JHB-SOW","population":32000,"equity_vulnerability":81,"reference_year":2025,"source_id":"src_za_demo_access_2025"},
+    {"feature_id":"dem_za_alx","geography_id":"ZA-GP-JHB-ALX","population":26000,"equity_vulnerability":84,"reference_year":2025,"source_id":"src_za_demo_access_2025"}
+  ],
+  "infrastructure": [
+    {"feature_id":"infra_za_sow_water","geography_id":"ZA-GP-JHB-SOW","category":"water","infrastructure_gap":69,"existing_facility_coverage":47,"reference_year":2025,"source_id":"src_za_demo_access_2025"},
+    {"feature_id":"infra_za_alx_san","geography_id":"ZA-GP-JHB-ALX","category":"sanitation","infrastructure_gap":77,"existing_facility_coverage":35,"reference_year":2025,"source_id":"src_za_demo_access_2025"}
+  ],
+  "projects": [
+    {"project_id":"inv_za_sow_water","geography_id":"ZA-GP-JHB-SOW","category":"water","name":"Local water reliability assessment example","status":"planned","strategic_alignment":83,"delivery_readiness":52,"existing_coverage_penalty":7,"source_id":"src_za_demo_plan_2026"}
+  ],
+  "seed_requests": [
+    {"request_id":"30000000-0000-4000-8000-000000000001","cluster_id":"33000000-0000-4000-8000-000000000001","geography_id":"ZA-GP-JHB-SOW","category":"water","subcategory":"water_supply","summary":"Repeated water interruptions affect households in Soweto.","requested_outcome":"Restore a reliable community water supply.","urgency":"high","latitude":-26.2678,"longitude":27.8585,"occurred_at":"2026-08-13T10:00:00Z","confidence":0.89}
+  ]
+}

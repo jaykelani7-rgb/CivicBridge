@@ -1,0 +1,36 @@
+{
+  "version": "priority-1.0.0",
+  "need_weights": {
+    "demand_rate": 0.25,
+    "infrastructure_gap": 0.20,
+    "severity": 0.15,
+    "equity_vulnerability": 0.15,
+    "affected_population": 0.10,
+    "recent_trend": 0.10,
+    "evidence_confidence": 0.05
+  },
+  "action_weights": {
+    "need_score": 0.60,
+    "strategic_alignment": 0.20,
+    "delivery_readiness": 0.10,
+    "data_confidence": 0.10
+  },
+  "severity": {"low": 25, "medium": 50, "high": 75, "critical": 100},
+  "fallbacks": {
+    "demand_rate": 50,
+    "infrastructure_gap": 50,
+    "equity_vulnerability": 50,
+    "affected_population": 50,
+    "recent_trend": 50,
+    "strategic_alignment": 50,
+    "delivery_readiness": 25,
+    "existing_coverage_penalty": 0
+  },
+  "missing_confidence_penalty": 0.10,
+  "trend_minimum_history_days": 30,
+  "normalization": {
+    "demand_rate_per_10000_cap": 25,
+    "affected_population_cap": 50000,
+    "trend_growth_cap": 1.0
+  }
+}

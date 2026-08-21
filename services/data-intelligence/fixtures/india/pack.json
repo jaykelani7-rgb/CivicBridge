@@ -1,0 +1,25 @@
+{
+  "country_code": "IN",
+  "admin_units": [
+    {"geography_id":"IN-RJ-JPR-W42","admin1":"Rajasthan","admin2":"Jaipur","locality":"Ward 42","centroid_lat":26.9124,"centroid_lon":75.7873,"polygon":[[75.73,26.86],[75.85,26.86],[75.85,26.97],[75.73,26.97]],"aliases":["ward 42","jaipur","जयपुर","वार्ड 42"],"boundary_source":"CivicBridge demo boundary derived from public administrative names","boundary_version":"demo-2026-08"},
+    {"geography_id":"IN-RJ-JPR-W18","admin1":"Rajasthan","admin2":"Jaipur","locality":"Ward 18","centroid_lat":26.955,"centroid_lon":75.72,"polygon":[[75.66,26.91],[75.77,26.91],[75.77,27.01],[75.66,27.01]],"aliases":["ward 18","jaipur ward 18","वार्ड 18"],"boundary_source":"CivicBridge demo boundary derived from public administrative names","boundary_version":"demo-2026-08"}
+  ],
+  "sources": [
+    {"source_id":"src_in_demo_urban_2025","publisher":"CivicBridge Hackathon Fixture Team","dataset_title":"Jaipur ward demographic and drainage indicators (synthetic demo fixture)","geographic_coverage":"Jaipur demo wards","time_coverage":"2025","retrieved_at":"2026-08-20","license":"CC BY 4.0 for fixture code","transformation_notes":"Synthetic, realistic values for deterministic offline demonstration; not official statistics.","confidence":0.70,"freshness_status":"current","synthetic":true},
+    {"source_id":"src_in_demo_plan_2026","publisher":"CivicBridge Hackathon Fixture Team","dataset_title":"Jaipur infrastructure investment plan examples (synthetic demo fixture)","geographic_coverage":"Jaipur demo wards","time_coverage":"2026-2027","retrieved_at":"2026-08-20","license":"CC BY 4.0 for fixture code","transformation_notes":"Synthetic project metadata; must not be presented as a real funded project.","confidence":0.65,"freshness_status":"current","synthetic":true}
+  ],
+  "demographics": [
+    {"feature_id":"dem_in_w42","geography_id":"IN-RJ-JPR-W42","population":12400,"equity_vulnerability":72,"reference_year":2025,"source_id":"src_in_demo_urban_2025"},
+    {"feature_id":"dem_in_w18","geography_id":"IN-RJ-JPR-W18","population":9800,"equity_vulnerability":48,"reference_year":2025,"source_id":"src_in_demo_urban_2025"}
+  ],
+  "infrastructure": [
+    {"feature_id":"infra_in_w42_drain","geography_id":"IN-RJ-JPR-W42","category":"drainage","infrastructure_gap":82,"existing_facility_coverage":31,"reference_year":2025,"source_id":"src_in_demo_urban_2025"},
+    {"feature_id":"infra_in_w18_road","geography_id":"IN-RJ-JPR-W18","category":"roads","infrastructure_gap":51,"existing_facility_coverage":58,"reference_year":2025,"source_id":"src_in_demo_urban_2025"}
+  ],
+  "projects": [
+    {"project_id":"inv_in_w42_drain","geography_id":"IN-RJ-JPR-W42","category":"drainage","name":"Ward drainage survey example","status":"planned","strategic_alignment":80,"delivery_readiness":55,"existing_coverage_penalty":8,"source_id":"src_in_demo_plan_2026"}
+  ],
+  "seed_requests": [
+    {"request_id":"10000000-0000-4000-8000-000000000001","cluster_id":"11000000-0000-4000-8000-000000000001","geography_id":"IN-RJ-JPR-W42","category":"drainage","subcategory":"stormwater_drainage","summary":"Recurring road flooding blocks access during rain in Ward 42.","requested_outcome":"Repair roadside stormwater drainage.","urgency":"high","latitude":26.9124,"longitude":75.7873,"occurred_at":"2026-08-15T10:00:00Z","confidence":0.90}
+  ]
+}

@@ -1,0 +1,24 @@
+[
+  {
+    "event_id":"b1000000-0000-4000-8000-000000000001","event_type":"request.normalized.v1","schema_version":"1.0.0",
+    "occurred_at":"2026-08-20T10:30:00Z","producer":"ai-normalization","trace_id":"b1100000-0000-4000-8000-000000000001",
+    "data":{"request_id":"b1200000-0000-4000-8000-000000000001","country_code":"BR","original_language":"pt-BR",
+      "translation_working":"Irregular waste collection leaves rubbish on Grajaú streets.","category":"waste","subcategory":"waste_collection",
+      "summary":"Coleta de lixo irregular deixa resíduos nas ruas do Grajaú.","problem_description":"Resíduos permanecem nas ruas.",
+      "requested_outcome":"Restabelecer uma coleta regular de resíduos.","urgency":"medium","affected_scope":"community",
+      "location_mentions":["Grajaú","São Paulo"],"evidence_types":["text","repeat_report"],"confidence":0.90,
+      "pii_flags":["none"],"needs_human_review":false,"review_reason":null,"model":"configured-gemini-model",
+      "prompt_version":"normalize-1.0.0","schema_version":"normalized-request-1.0.0"}
+  },
+  {
+    "event_id":"b1000000-0000-4000-8000-000000000002","event_type":"request.normalized.v1","schema_version":"1.0.0",
+    "occurred_at":"2026-08-18T09:00:00Z","producer":"ai-normalization","trace_id":"b1100000-0000-4000-8000-000000000002",
+    "data":{"request_id":"b1200000-0000-4000-8000-000000000002","country_code":"BR","original_language":"pt-BR",
+      "translation_working":"Sewer service is incomplete in Capela do Socorro.","category":"sanitation","subcategory":"sewer_access",
+      "summary":"Moradores relatam acesso incompleto à rede de esgoto.","problem_description":"A cobertura de esgoto não atende toda a área.",
+      "requested_outcome":"Ampliar o acesso seguro à rede de esgoto.","urgency":"high","affected_scope":"community",
+      "location_mentions":["Capela do Socorro","São Paulo"],"evidence_types":["voice"],"confidence":0.87,
+      "pii_flags":["none"],"needs_human_review":false,"review_reason":null,"model":"configured-gemini-model",
+      "prompt_version":"normalize-1.0.0","schema_version":"normalized-request-1.0.0"}
+  }
+]

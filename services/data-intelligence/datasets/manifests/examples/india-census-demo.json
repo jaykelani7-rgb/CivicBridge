@@ -1,0 +1,28 @@
+{
+  "manifest_version":"official-dataset-manifest-1.0.0",
+  "dataset_id":"india_census_population_example",
+  "dataset_version":"2011-v1",
+  "source_id":"in.census.population.2011",
+  "publisher":"Office of the Registrar General & Census Commissioner, India",
+  "dataset_title":"Census of India 2011 population example",
+  "country_code":"IN",
+  "geographic_coverage":"India; only records transformed to CivicBridge geography IDs should be loaded",
+  "time_coverage":"2011",
+  "retrieved_at":"2026-08-20",
+  "license":"Confirm the applicable Government Open Data License before production use",
+  "source_url":"https://censusindia.gov.in/census.website/data/census-tables",
+  "transformation_notes":"Example manifest only. Download through the publisher's approved channel, retain the raw checksum, map official area codes to versioned CivicBridge geography IDs, validate totals, and export the normalized columns as Parquet before replacing the placeholder URI.",
+  "confidence":0.95,
+  "freshness_status":"historical",
+  "synthetic":false,
+  "assets":[
+    {
+      "asset_id":"population_normalized",
+      "uri":"gs://YOUR_VERSIONED_DATA_BUCKET/india/census/2011-v1/demographic_features.parquet",
+      "target_table":"demographic_features",
+      "source_format":"PARQUET",
+      "normalized_schema_version":"official-normalized-1.0.0",
+      "description":"Normalized demographic features keyed by versioned CivicBridge geography_id."
+    }
+  ]
+}

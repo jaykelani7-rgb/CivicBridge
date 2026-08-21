@@ -1,0 +1,25 @@
+{
+  "country_code": "BR",
+  "admin_units": [
+    {"geography_id":"BR-SP-SAO-GRA","admin1":"São Paulo","admin2":"São Paulo","locality":"Grajaú","centroid_lat":-23.77,"centroid_lon":-46.67,"polygon":[[-46.75,-23.84],[-46.59,-23.84],[-46.59,-23.69],[-46.75,-23.69]],"aliases":["grajau","grajaú","sao paulo","são paulo"],"boundary_source":"CivicBridge demo boundary derived from public administrative names","boundary_version":"demo-2026-08"},
+    {"geography_id":"BR-SP-SAO-CAP","admin1":"São Paulo","admin2":"São Paulo","locality":"Capela do Socorro","centroid_lat":-23.74,"centroid_lon":-46.70,"polygon":[[-46.78,-23.79],[-46.65,-23.79],[-46.65,-23.66],[-46.78,-23.66]],"aliases":["capela do socorro","socorro"],"boundary_source":"CivicBridge demo boundary derived from public administrative names","boundary_version":"demo-2026-08"}
+  ],
+  "sources": [
+    {"source_id":"src_br_demo_service_2025","publisher":"CivicBridge Hackathon Fixture Team","dataset_title":"São Paulo service access indicators (synthetic demo fixture)","geographic_coverage":"São Paulo demo districts","time_coverage":"2025","retrieved_at":"2026-08-20","license":"CC BY 4.0 for fixture code","transformation_notes":"Synthetic normalized indicators for offline tests; not official statistics.","confidence":0.70,"freshness_status":"current","synthetic":true},
+    {"source_id":"src_br_demo_plan_2026","publisher":"CivicBridge Hackathon Fixture Team","dataset_title":"São Paulo investment examples (synthetic demo fixture)","geographic_coverage":"São Paulo demo districts","time_coverage":"2026","retrieved_at":"2026-08-20","license":"CC BY 4.0 for fixture code","transformation_notes":"Synthetic plan record.","confidence":0.65,"freshness_status":"current","synthetic":true}
+  ],
+  "demographics": [
+    {"feature_id":"dem_br_gra","geography_id":"BR-SP-SAO-GRA","population":45000,"equity_vulnerability":78,"reference_year":2025,"source_id":"src_br_demo_service_2025"},
+    {"feature_id":"dem_br_cap","geography_id":"BR-SP-SAO-CAP","population":37000,"equity_vulnerability":69,"reference_year":2025,"source_id":"src_br_demo_service_2025"}
+  ],
+  "infrastructure": [
+    {"feature_id":"infra_br_gra_waste","geography_id":"BR-SP-SAO-GRA","category":"waste","infrastructure_gap":74,"existing_facility_coverage":41,"reference_year":2025,"source_id":"src_br_demo_service_2025"},
+    {"feature_id":"infra_br_cap_san","geography_id":"BR-SP-SAO-CAP","category":"sanitation","infrastructure_gap":63,"existing_facility_coverage":52,"reference_year":2025,"source_id":"src_br_demo_service_2025"}
+  ],
+  "projects": [
+    {"project_id":"inv_br_gra_waste","geography_id":"BR-SP-SAO-GRA","category":"waste","name":"Community collection route study example","status":"planned","strategic_alignment":76,"delivery_readiness":48,"existing_coverage_penalty":5,"source_id":"src_br_demo_plan_2026"}
+  ],
+  "seed_requests": [
+    {"request_id":"20000000-0000-4000-8000-000000000001","cluster_id":"22000000-0000-4000-8000-000000000001","geography_id":"BR-SP-SAO-GRA","category":"waste","subcategory":"waste_collection","summary":"Coleta de lixo irregular deixa resíduos nas ruas do Grajaú.","requested_outcome":"Restabelecer uma coleta regular de resíduos.","urgency":"medium","latitude":-23.77,"longitude":-46.67,"occurred_at":"2026-08-14T10:00:00Z","confidence":0.88}
+  ]
+}
