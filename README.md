@@ -306,3 +306,28 @@ civicbridge/
    ```
    The API will be running locally at `http://localhost:8000`. 
    Interactive documentation will be available at `http://localhost:8000/docs` (Swagger UI).
+
+### AI Normalization Service (Shreyank)
+
+The real AI Normalization backend (Speech-to-Text, Translation, Gemini structured extraction, PII/validation, event-driven auto-normalization) lives in `services/ai_normalization/`. It replaces the earlier one-endpoint stub and runs as its own service on port 8001:
+
+```bash
+cd <repo root>
+pip install -r services/ai_normalization/requirements.txt
+PYTHONPATH=. uvicorn services.ai_normalization.main:app --host 127.0.0.1 --port 8001 --reload
+```
+
+It runs with `USE_MOCK_SERVICES=true` by default (no GCP credentials needed) and exposes:
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET`  | `/health` | Liveness, mock/real config, Citizen Channels reachability |
+| `POST` | `/internal/v1/normalizations` | Normalize one request by `request_id` |
+| `GET`  | `/internal/v1/normalizations/{request_id}` | Retrieve the latest normalization result |
+| `POST` | `/internal/v1/normalizations/{request_id}/retry` | Re-run the pipeline |
+| `POST` | `/internal/v1/policy-briefs/draft` | Bounded-evidence project-brief draft for Sharmad's service |
+
+See `services/ai_normalization/README.md` for the full write-up, including how
+to point it at real Google Cloud APIs, its evaluation harness
+(`services/ai_normalization/evaluate.py`) and results against the gold
+evaluation set, and its test suite (`services/ai_normalization/tests/`).
