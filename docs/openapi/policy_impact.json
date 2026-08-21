@@ -1,0 +1,1460 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CivicBridge AI - Policy + Impact Service",
+    "description": "CivicBridge AI - Policy + Impact Backend Service owned by Sharmad.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Get Health",
+        "operationId": "get_health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recommendations": {
+      "post": {
+        "tags": [
+          "Recommendations"
+        ],
+        "summary": "Create Recommendation",
+        "operationId": "create_recommendation_v1_recommendations_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recommendation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or Grounding Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Evidence Bundle Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Recommendations"
+        ],
+        "summary": "List Recommendations",
+        "operationId": "list_recommendations_v1_recommendations_get",
+        "parameters": [
+          {
+            "name": "hotspot_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hotspot Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Recommendation"
+                  },
+                  "title": "Response List Recommendations V1 Recommendations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recommendations/{recommendation_id}": {
+      "get": {
+        "tags": [
+          "Recommendations"
+        ],
+        "summary": "Get Recommendation",
+        "operationId": "get_recommendation_v1_recommendations__recommendation_id__get",
+        "parameters": [
+          {
+            "name": "recommendation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Recommendation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recommendation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recommendations/{recommendation_id}/decisions": {
+      "post": {
+        "tags": [
+          "Policy Decisions"
+        ],
+        "summary": "Record Decision",
+        "operationId": "record_decision_v1_recommendations__recommendation_id__decisions_post",
+        "parameters": [
+          {
+            "name": "recommendation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Recommendation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDecisionCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recommendations/{recommendation_id}/assignments": {
+      "post": {
+        "tags": [
+          "Policy Decisions"
+        ],
+        "summary": "Assign Recommendation",
+        "operationId": "assign_recommendation_v1_recommendations__recommendation_id__assignments_post",
+        "parameters": [
+          {
+            "name": "recommendation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Recommendation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recommendation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Create Project",
+        "operationId": "create_project_v1_projects_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unapproved Recommendation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recommendation Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "List Projects",
+        "operationId": "list_projects_v1_projects_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Project"
+                  },
+                  "title": "Response List Projects V1 Projects Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project_id}": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Get Project",
+        "operationId": "get_project_v1_projects__project_id__get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project_id}/milestones": {
+      "post": {
+        "tags": [
+          "Project Milestones"
+        ],
+        "summary": "Add Milestone",
+        "operationId": "add_milestone_v1_projects__project_id__milestones_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MilestoneCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Milestone"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project_id}/metrics": {
+      "post": {
+        "tags": [
+          "Impact Metrics"
+        ],
+        "summary": "Add Impact Metric",
+        "operationId": "add_impact_metric_v1_projects__project_id__metrics_post",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImpactMetricCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpactMetric"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Impact Metrics"
+        ],
+        "summary": "Get Project Metrics",
+        "operationId": "get_project_metrics_v1_projects__project_id__metrics_get",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImpactMetric"
+                  },
+                  "title": "Response Get Project Metrics V1 Projects  Project Id  Metrics Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/policy-impact/status-summary/{request_id}": {
+      "get": {
+        "tags": [
+          "Internal Status Summary"
+        ],
+        "summary": "Get Public Safe Status Summary",
+        "description": "Returns public-safe processing and project status summary for Sujal's Citizen Channels.\nNo private citizen information, exact household coordinates, or raw media are exposed.",
+        "operationId": "get_public_safe_status_summary_internal_v1_policy_impact_status_summary__request_id__get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Read Root",
+        "operationId": "read_root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssignmentRequest": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "reviewer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department"
+        ],
+        "title": "AssignmentRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ImpactMetric": {
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "title": "Metric Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "metric_code": {
+            "type": "string",
+            "title": "Metric Code"
+          },
+          "baseline": {
+            "type": "number",
+            "title": "Baseline"
+          },
+          "target": {
+            "type": "number",
+            "title": "Target"
+          },
+          "current": {
+            "type": "number",
+            "title": "Current"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "measured_at": {
+            "type": "string",
+            "title": "Measured At"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "default": 0.85
+          },
+          "outcome_status": {
+            "type": "string",
+            "title": "Outcome Status",
+            "default": "improving"
+          },
+          "recorded_at": {
+            "type": "string",
+            "title": "Recorded At"
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "default": "impact-metric-1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "metric_code",
+          "baseline",
+          "target",
+          "current",
+          "unit",
+          "source_id",
+          "measured_at",
+          "recorded_at"
+        ],
+        "title": "ImpactMetric"
+      },
+      "ImpactMetricCreateRequest": {
+        "properties": {
+          "metric_code": {
+            "type": "string",
+            "title": "Metric Code",
+            "description": "Unique metric identifier, e.g. road_flooding_request_rate"
+          },
+          "baseline": {
+            "type": "number",
+            "title": "Baseline",
+            "description": "Baseline measurement value"
+          },
+          "target": {
+            "type": "number",
+            "title": "Target",
+            "description": "Target target value"
+          },
+          "current": {
+            "type": "number",
+            "title": "Current",
+            "description": "Current measured value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "description": "Measurement unit, e.g. requests_per_10000_people_per_month"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id",
+            "description": "Data source reference, e.g. civicbridge_validated_requests"
+          },
+          "measured_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured At",
+            "description": "ISO timestamp of measurement date"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "Measurement data confidence score",
+            "default": 0.85
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_code",
+          "baseline",
+          "target",
+          "current",
+          "unit",
+          "source_id"
+        ],
+        "title": "ImpactMetricCreateRequest"
+      },
+      "Milestone": {
+        "properties": {
+          "milestone_id": {
+            "type": "string",
+            "title": "Milestone Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "pending"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "title"
+        ],
+        "title": "Milestone"
+      },
+      "MilestoneCreateRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Title"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "MilestoneCreateRequest"
+      },
+      "PolicyAction": {
+        "type": "string",
+        "enum": [
+          "approve_for_assessment",
+          "request_evidence",
+          "edit",
+          "assign",
+          "defer",
+          "reject"
+        ],
+        "title": "PolicyAction"
+      },
+      "PolicyDecision": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "recommendation_id": {
+            "type": "string",
+            "title": "Recommendation Id"
+          },
+          "action": {
+            "$ref": "#/components/schemas/PolicyAction"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "actor_id": {
+            "type": "string",
+            "title": "Actor Id"
+          },
+          "actor_role": {
+            "type": "string",
+            "title": "Actor Role"
+          },
+          "decided_at": {
+            "type": "string",
+            "title": "Decided At"
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "default": "policy-decision-1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recommendation_id",
+          "action",
+          "reason",
+          "actor_id",
+          "actor_role",
+          "decided_at"
+        ],
+        "title": "PolicyDecision"
+      },
+      "PolicyDecisionCreateRequest": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/PolicyAction"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "title": "Reason",
+            "description": "Justification for the human decision"
+          },
+          "actor_id": {
+            "type": "string",
+            "title": "Actor Id",
+            "description": "ID of the human decision maker"
+          },
+          "actor_role": {
+            "type": "string",
+            "title": "Actor Role",
+            "description": "Role of the actor, e.g. decision_maker, analyst",
+            "default": "decision_maker"
+          },
+          "assigned_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned To",
+            "description": "Department or reviewer if action is assign"
+          },
+          "edited_fields": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited Fields",
+            "description": "Updated recommendation fields if action is edit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "reason",
+          "actor_id"
+        ],
+        "title": "PolicyDecisionCreateRequest"
+      },
+      "Project": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "recommendation_id": {
+            "type": "string",
+            "title": "Recommendation Id"
+          },
+          "hotspot_id": {
+            "type": "string",
+            "title": "Hotspot Id"
+          },
+          "country_code": {
+            "type": "string",
+            "title": "Country Code",
+            "default": "IN"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "sector": {
+            "type": "string",
+            "title": "Sector",
+            "default": "drainage"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProjectStatus",
+            "default": "candidate"
+          },
+          "assigned_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Department"
+          },
+          "milestones": {
+            "items": {
+              "$ref": "#/components/schemas/Milestone"
+            },
+            "type": "array",
+            "title": "Milestones"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "default": "project-1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recommendation_id",
+          "hotspot_id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Project"
+      },
+      "ProjectCreateRequest": {
+        "properties": {
+          "recommendation_id": {
+            "type": "string",
+            "title": "Recommendation Id",
+            "description": "Must reference an approved recommendation"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Optional custom title"
+          },
+          "assigned_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Department",
+            "description": "Department responsible for execution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recommendation_id"
+        ],
+        "title": "ProjectCreateRequest"
+      },
+      "ProjectStatus": {
+        "type": "string",
+        "enum": [
+          "candidate",
+          "in_feasibility",
+          "approved_for_construction",
+          "in_progress",
+          "completed",
+          "cancelled"
+        ],
+        "title": "ProjectStatus"
+      },
+      "Recommendation": {
+        "properties": {
+          "recommendation_id": {
+            "type": "string",
+            "title": "Recommendation Id"
+          },
+          "hotspot_id": {
+            "type": "string",
+            "title": "Hotspot Id"
+          },
+          "evidence_bundle_id": {
+            "type": "string",
+            "title": "Evidence Bundle Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "problem": {
+            "type": "string",
+            "title": "Problem"
+          },
+          "proposed_intervention": {
+            "type": "string",
+            "title": "Proposed Intervention"
+          },
+          "intended_beneficiaries": {
+            "type": "integer",
+            "title": "Intended Beneficiaries"
+          },
+          "supporting_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supporting Evidence Ids"
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Risks"
+          },
+          "missing_information": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Information"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RecommendationStatus",
+            "default": "under_review"
+          },
+          "ai_draft": {
+            "type": "boolean",
+            "title": "Ai Draft",
+            "default": true
+          },
+          "human_approved": {
+            "type": "boolean",
+            "title": "Human Approved",
+            "default": false
+          },
+          "assigned_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Department"
+          },
+          "assigned_reviewer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Reviewer"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "schema_version": {
+            "type": "string",
+            "title": "Schema Version",
+            "default": "recommendation-1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hotspot_id",
+          "evidence_bundle_id",
+          "title",
+          "problem",
+          "proposed_intervention",
+          "intended_beneficiaries",
+          "confidence",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Recommendation"
+      },
+      "RecommendationCreateRequest": {
+        "properties": {
+          "hotspot_id": {
+            "type": "string",
+            "title": "Hotspot Id",
+            "description": "Target hotspot UUID"
+          },
+          "evidence_bundle_id": {
+            "type": "string",
+            "title": "Evidence Bundle Id",
+            "description": "Associated evidence bundle ID from Data Intelligence"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Optional custom title or AI generated"
+          },
+          "override_draft": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Draft",
+            "description": "Manual recommendation submission without AI draft call",
+            "default": false
+          },
+          "manual_fields": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Fields",
+            "description": "Optional fields if override_draft is True"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hotspot_id",
+          "evidence_bundle_id"
+        ],
+        "title": "RecommendationCreateRequest"
+      },
+      "RecommendationStatus": {
+        "type": "string",
+        "enum": [
+          "under_review",
+          "approved_for_assessment",
+          "evidence_requested",
+          "deferred",
+          "rejected",
+          "assigned"
+        ],
+        "title": "RecommendationStatus"
+      },
+      "StandardErrorBody": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Machine-readable error code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable error explanation"
+          },
+          "retryable": {
+            "type": "boolean",
+            "title": "Retryable",
+            "description": "Whether the operation can be retried safely",
+            "default": false
+          },
+          "details": {
+            "items": {},
+            "type": "array",
+            "title": "Details",
+            "description": "Additional context or validation details"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id",
+            "description": "Distributed trace identifier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "StandardErrorBody"
+      },
+      "StandardErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/StandardErrorBody"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "StandardErrorResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

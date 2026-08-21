@@ -1,0 +1,61 @@
+{
+  "country_code": "IN",
+  "city": "Jaipur",
+  "geography_id": "IN-RJ-JPR-W42",
+  "hotspot": {
+    "hotspot_id": "50f27173-1c2d-42d3-82ee-8ef2bfc7ef46",
+    "country_code": "IN",
+    "geography_id": "IN-RJ-JPR-W42",
+    "category": "drainage",
+    "request_count": 38,
+    "unique_request_count": 29,
+    "affected_population": 12400,
+    "trend_30d": 0.27,
+    "need_score": 78.4,
+    "action_score": 73.1,
+    "evidence_confidence": 0.86,
+    "score_version": "priority-1.0.0",
+    "evidence_bundle_id": "evb_01J5R4A3_IN",
+    "calculated_at": "2026-08-20T10:32:00Z"
+  },
+  "evidence_bundle": {
+    "evidence_bundle_id": "evb_01J5R4A3_IN",
+    "hotspot_id": "50f27173-1c2d-42d3-82ee-8ef2bfc7ef46",
+    "valid_evidence_ids": [
+      "src_population_42",
+      "cluster_drainage_42",
+      "src_infra_gap_42",
+      "src_investment_plan_rj_2025"
+    ],
+    "summary": "Ward 42 Jaipur drainage infrastructure demand hotspot.",
+    "citizen_summaries": [
+      "Recurring road flooding is blocking access during monsoon rains.",
+      "Stormwater drain overflow near Ward 42 main road causing waterlogging."
+    ],
+    "demographic_indicators": {
+      "affected_population": 12400,
+      "source_id": "src_population_42"
+    },
+    "infrastructure_gap": {
+      "gap_score": 82.5,
+      "source_id": "src_infra_gap_42"
+    }
+  },
+  "recommendation_seed": {
+    "recommendation_id": "eb8fe54f-9443-4f93-af48-c2d3712da25a",
+    "hotspot_id": "50f27173-1c2d-42d3-82ee-8ef2bfc7ef46",
+    "evidence_bundle_id": "evb_01J5R4A3_IN",
+    "title": "Ward 42 stormwater drainage rehabilitation assessment",
+    "problem": "Recurring flooding is restricting road access during rainfall.",
+    "proposed_intervention": "Conduct a feasibility assessment for drain repair and additional stormwater capacity.",
+    "intended_beneficiaries": 12400,
+    "supporting_evidence_ids": ["src_population_42", "cluster_drainage_42"],
+    "risks": ["Current drain-capacity survey is incomplete."],
+    "missing_information": ["Detailed engineering survey"],
+    "confidence": 0.82,
+    "status": "under_review",
+    "ai_draft": true,
+    "human_approved": false,
+    "schema_version": "recommendation-1.0.0"
+  }
+}
