@@ -25,7 +25,9 @@ The three service Dockerfiles build from the repository root using their adjacen
 
 For an end-to-end smoke test, obtain a caller identity token, submit a synthetic request to Citizen Channels, then verify the three delivery-ledger tables and safe Cloud Logging entries. Re-publishing the identical event ID must return 204 without a second processing result. Do not use real citizen submissions for smoke tests.
 
-Production durability is intentionally partial: AI/Policy input delivery ledgers and Data Intelligence input/embedding records are in BigQuery, while Citizen request/media state, AI normalization cache, Policy recommendations, and Data Intelligence clusters/hotspots/evidence/outbox still use process memory, local files, or SQLite. Cloud Run filesystems are ephemeral. BigQuery is appropriate for analytical snapshots but not a replacement for transactional operational state; Cloud SQL or another transactional store needs separate approval. The temporary `hotspot-updated-v1-debug` subscription may remain for testing and should be deleted only after confirmation.
+Production durability is intentionally partial: AI/Policy input delivery ledgers and Data Intelligence input/embedding records are in BigQuery, while Citizen request/media state, AI normalization cache, Policy recommendations, and Data Intelligence clusters/hotspots/evidence/outbox still use process memory, local files, or SQLite. Cloud Run filesystems are ephemeral. BigQuery is appropriate for analytical snapshots but not a replacement for transactional operational state; Cloud SQL or another transactional store needs separate approval.
+
+Hackathon readiness and DLQ inspection commands are in [docs/hackathon-backend-operations.md](docs/hackathon-backend-operations.md). The proposed transactional migration, Cloud SQL ownership boundary and rollback sequence are in [docs/production-persistence-migration.md](docs/production-persistence-migration.md). Cloud SQL is not provisioned.
 
 ---
 
