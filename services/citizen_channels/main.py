@@ -23,8 +23,21 @@ from packages.contracts.citizen import (
     RequestCreatedData,
     RequestConfirmedData
 )
-from packages.event_bus.bus import event_bus
+from packages.event_bus.bus import event_bus as local_event_bus
+from packages.cloud_runtime import PubSubEventBus
 from services.citizen_channels.storage import citizen_storage
+
+event_bus = (
+    PubSubEventBus(
+        os.getenv("CITIZEN_PUBSUB_PROJECT", ""),
+        {
+            "request.created.v1": os.getenv("CITIZEN_REQUEST_CREATED_TOPIC", "request-created-v1"),
+            "request.confirmed.v1": os.getenv("CITIZEN_REQUEST_CONFIRMED_TOPIC", "request-confirmed-v1"),
+        },
+    )
+    if os.getenv("CITIZEN_EVENT_BUS", "memory") == "pubsub"
+    else local_event_bus
+)
 
 # Allowed file extensions and maximum size (10 MB)
 ALLOWED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".ogg", ".jpg", ".jpeg", ".png"}

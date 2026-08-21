@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional
 import httpx
 
 from services.ai_normalization.config import settings
+from packages.cloud_runtime import cloud_run_headers
 
 logger = logging.getLogger("ai-normalization.citizen-channels-client")
 
@@ -35,6 +36,7 @@ class CitizenChannelsClient:
         try:
             resp = httpx.get(
                 f"{self.base_url}/internal/v1/requests/{request_id}/content",
+                headers=cloud_run_headers(self.base_url, settings.AUTHENTICATE_CLOUD_RUN),
                 timeout=self.timeout,
             )
             if resp.status_code == 200:

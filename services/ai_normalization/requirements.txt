@@ -9,10 +9,11 @@ pytest>=8.0.0
 pytest-asyncio>=0.23.0
 python-multipart>=0.0.9
 
-# Optional: only required when USE_MOCK_SERVICES=false. Installed lazily/guarded
-# with try/except at import time (see pipeline/speech.py, pipeline/translation.py,
-# pipeline/extraction.py, pipeline/policy_brief.py) so their absence never breaks
-# the mock-mode demo path.
-# google-cloud-speech>=2.24.0
-# google-cloud-translate>=3.15.0
-# google-cloud-aiplatform>=1.45.0
+# Real Google Cloud adapters. Imports are lazy so mock mode remains credential-free,
+# but production images must contain the clients when USE_MOCK_SERVICES=false.
+google-cloud-speech>=2.24.0
+google-cloud-translate>=3.15.0
+google-cloud-aiplatform>=1.45.0
+google-cloud-pubsub>=2.23.0
+google-cloud-bigquery>=3.25.0
+google-auth>=2.35.0

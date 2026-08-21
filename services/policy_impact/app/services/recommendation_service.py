@@ -14,6 +14,7 @@ from services.policy_impact.app.database import PolicyImpactRepository, get_repo
 from services.policy_impact.app.services.evidence_validator import EvidenceValidator
 from services.policy_impact.app.stubs.ai_normalization_stub import AINormalizationClient
 from services.policy_impact.app.stubs.data_intelligence_stub import DataIntelligenceClient
+from services.policy_impact.app.config import settings
 
 logger = logging.getLogger("recommendation-service")
 
@@ -26,8 +27,16 @@ class RecommendationService:
         ai_client: Optional[AINormalizationClient] = None,
     ):
         self.repo = repository or get_repository()
-        self.data_client = data_client or DataIntelligenceClient()
-        self.ai_client = ai_client or AINormalizationClient()
+        self.data_client = data_client or DataIntelligenceClient(
+            settings.JAY_DATA_INTELLIGENCE_URL,
+            settings.ENABLE_MOCK_STUBS,
+            settings.AUTHENTICATE_CLOUD_RUN,
+        )
+        self.ai_client = ai_client or AINormalizationClient(
+            settings.SHREYANK_AI_SERVICE_URL,
+            settings.ENABLE_MOCK_STUBS,
+            settings.AUTHENTICATE_CLOUD_RUN,
+        )
         self.event_bus = get_event_bus()
 
     def create_recommendation(self, req: RecommendationCreateRequest) -> Recommendation:

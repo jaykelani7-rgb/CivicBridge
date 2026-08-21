@@ -66,7 +66,13 @@ class NormalizationService:
     def get(self, request_id: str) -> Optional[NormalizationRecord]:
         return self.repo.get(request_id)
 
-    def normalize_request(self, request_id: str, force: bool = False, trace_id: Optional[str] = None) -> Tuple[NormalizationRecord, bool]:
+    def normalize_request(
+        self,
+        request_id: str,
+        force: bool = False,
+        trace_id: Optional[str] = None,
+        location_hints: Optional[list[str]] = None,
+    ) -> Tuple[NormalizationRecord, bool]:
         """
         Runs (or returns the cached result of) the full pipeline for one
         request. Returns (record, was_newly_processed).
@@ -94,6 +100,11 @@ class NormalizationService:
         )
 
         extraction, extraction_status = self.extractor.extract(translation_working, country_code)
+        if location_hints:
+            extraction["location_mentions"] = list(dict.fromkeys([
+                *extraction.get("location_mentions", []),
+                *(hint for hint in location_hints if hint),
+            ]))
 
         # PII scan runs on BOTH the preserved original and the working translation,
         # per contract.md Section 12: mask before analytics, never overwrite the original meaning.

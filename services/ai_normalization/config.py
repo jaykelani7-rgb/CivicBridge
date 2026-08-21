@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     RECOMMENDATION_PROMPT_VERSION: str = "policy-brief-draft-1.0.0"
 
     SERVICE_PORT: int = int(os.getenv("AI_NORMALIZATION_PORT", "8001"))
+    EVENT_BUS: str = os.getenv("AI_EVENT_BUS", "memory")
+    PUBSUB_PROJECT: str = os.getenv("AI_PUBSUB_PROJECT", "")
+    NORMALIZED_TOPIC: str = os.getenv("AI_NORMALIZED_TOPIC", "request-normalized-v1")
+    REVIEW_TOPIC: str = os.getenv("AI_REVIEW_TOPIC", "request-needs-review-v1")
+    IDEMPOTENCY_BACKEND: str = os.getenv("AI_IDEMPOTENCY_BACKEND", "local")
+    BIGQUERY_DATASET: str = os.getenv("AI_BIGQUERY_DATASET", "civicbridge_ai_normalization")
+    AUTHENTICATE_CLOUD_RUN: bool = os.getenv("AI_AUTHENTICATE_CLOUD_RUN", "false").lower() == "true"
 
 
 settings = Settings()

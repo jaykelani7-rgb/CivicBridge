@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from packages.event_bus.bus import EventBus, event_bus as shared_event_bus
+from packages.cloud_runtime import BigQueryDeliveryLedger, PubSubEventBus
 
 from services.ai_normalization.api.errors import NormalizationAPIError
 from services.ai_normalization.api.routes import router
@@ -58,7 +59,17 @@ def create_app(
 ) -> FastAPI:
     settings = settings or default_settings
     repository = repository or get_repository()
-    event_bus = event_bus or shared_event_bus
+    event_bus = event_bus or (
+        PubSubEventBus(
+            settings.PUBSUB_PROJECT,
+            {
+                "request.normalized.v1": settings.NORMALIZED_TOPIC,
+                "request.needs_review.v1": settings.REVIEW_TOPIC,
+            },
+        )
+        if settings.EVENT_BUS == "pubsub"
+        else shared_event_bus
+    )
     citizen_client = citizen_client or CitizenChannelsClient(
         base_url=settings.CITIZEN_CHANNELS_URL, timeout=settings.CITIZEN_CHANNELS_TIMEOUT_SECONDS
     )
@@ -99,6 +110,11 @@ def create_app(
     app.state.citizen_client = citizen_client
     app.state.service = service
     app.state.policy_brief_drafter = policy_brief_drafter
+    app.state.delivery_ledger = (
+        BigQueryDeliveryLedger(settings.GCP_PROJECT_ID, settings.BIGQUERY_DATASET, settings.GCP_LOCATION)
+        if settings.IDEMPOTENCY_BACKEND == "bigquery"
+        else None
+    )
 
     app.include_router(router)
 

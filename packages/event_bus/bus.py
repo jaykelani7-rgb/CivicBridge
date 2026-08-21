@@ -71,3 +71,9 @@ event_bus = EventBus()
 
 def get_event_bus() -> EventBus:
     return event_bus
+
+
+def configure_event_bus(configured: EventBus) -> EventBus:
+    global event_bus
+    event_bus = configured
+    return event_bus

@@ -3,14 +3,16 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import httpx
+from packages.cloud_runtime import cloud_run_headers
 
 logger = logging.getLogger("data-intelligence-stub")
 
 
 class DataIntelligenceClient:
-    def __init__(self, base_url: str = "http://127.0.0.1:8002", enable_mock: bool = True):
+    def __init__(self, base_url: str = "http://127.0.0.1:8002", enable_mock: bool = True, authenticate_cloud_run: bool = False):
         self.base_url = base_url
         self.enable_mock = enable_mock
+        self.authenticate_cloud_run = authenticate_cloud_run
         self._fixtures_cache: Dict[str, dict] = {}
         self._load_fixtures()
 
@@ -60,10 +62,23 @@ class DataIntelligenceClient:
             }
 
         try:
-            resp = httpx.get(f"{self.base_url}/v1/hotspots/{hotspot_id}/evidence", timeout=3.0)
+            resp = httpx.get(
+                f"{self.base_url}/v1/hotspots/{hotspot_id}/evidence",
+                headers=cloud_run_headers(self.base_url, self.authenticate_cloud_run),
+                timeout=10.0,
+            )
             if resp.status_code == 200:
-                return resp.json()
+                bundle = resp.json()
+                if "valid_evidence_ids" not in bundle:
+                    ids = list(bundle.get("request_and_cluster_evidence_ids", []))
+                    ids.extend(
+                        row.get("source_id")
+                        for row in bundle.get("data_sources", [])
+                        if row.get("source_id")
+                    )
+                    bundle["valid_evidence_ids"] = list(dict.fromkeys(ids))
+                return bundle
         except Exception as e:
             logger.warning(f"HTTP call to Jay's service failed ({e}). Falling back to mock fixture.")
 
-        return self.get_evidence_bundle(hotspot_id, evidence_bundle_id)
+        return None

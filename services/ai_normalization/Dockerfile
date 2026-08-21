@@ -22,5 +22,5 @@ COPY services/ai_normalization ./services/ai_normalization
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
 USER appuser
 
-EXPOSE 8001
-CMD ["uvicorn", "services.ai_normalization.main:app", "--host", "0.0.0.0", "--port", "8001"]
+EXPOSE 8080
+CMD ["sh", "-c", "uvicorn services.ai_normalization.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

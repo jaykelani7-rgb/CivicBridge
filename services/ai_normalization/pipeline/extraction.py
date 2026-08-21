@@ -24,6 +24,30 @@ from packages.schemas import CitizenRequestAIResponse
 
 logger = logging.getLogger("ai-normalization.extraction")
 
+
+def _vertex_response_schema(value: Any) -> Any:
+    """Convert Pydantic JSON Schema into the OpenAPI subset Vertex accepts."""
+    if isinstance(value, list):
+        return [_vertex_response_schema(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    nullable = value.get("anyOf")
+    if isinstance(nullable, list):
+        concrete = [item for item in nullable if item.get("type") != "null"]
+        if len(concrete) == 1 and len(concrete) != len(nullable):
+            converted = _vertex_response_schema(concrete[0])
+            converted["nullable"] = True
+            return converted
+    converted = {}
+    for key, item in value.items():
+        if key in {"title", "default", "$defs", "$schema"}:
+            continue
+        if key == "type" and isinstance(item, str):
+            converted[key] = item.upper()
+        else:
+            converted[key] = _vertex_response_schema(item)
+    return converted
+
 SYSTEM_INSTRUCTION_TEMPLATE = (
     "You are a CivicBridge AI citizen request analyst. Extract structured indicators "
     "from the user request.\n"
@@ -292,7 +316,7 @@ class GeminiExtractionAdapter:
             subcategories=json.dumps(taxonomy["subcategories"]),
         )
         prompt = f"System Instructions:\n{system_instruction}\n\nCitizen Request Text:\n{text}\n"
-        response_schema = CitizenRequestAIResponse.model_json_schema()
+        response_schema = _vertex_response_schema(CitizenRequestAIResponse.model_json_schema())
         generation_config = {
             "response_mime_type": "application/json",
             "response_schema": response_schema,

@@ -1,9 +1,16 @@
+import base64
+import binascii
+import json
+import logging
 import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, Request, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
+from packages.contracts.citizen import RequestConfirmedData, RequestCreatedData
+from packages.contracts.envelope import EventEnvelope
+from packages.cloud_runtime import cloud_run_headers
 from packages.contracts.normalization import NormalizedRequestData
 
 from services.ai_normalization.api.errors import NormalizationAPIError
@@ -13,6 +20,17 @@ from services.ai_normalization.pipeline.normalization_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger("ai-normalization.pubsub")
+
+
+class PubSubMessage(BaseModel):
+    data: str
+    message_id: str = Field(alias="messageId")
+
+
+class PubSubEnvelope(BaseModel):
+    message: PubSubMessage
+    subscription: str
 
 
 class NormalizeRequestBody(BaseModel):
@@ -55,7 +73,11 @@ def health(request: Request):
     try:
         import httpx
 
-        resp = httpx.get(f"{settings.CITIZEN_CHANNELS_URL}/health", timeout=1.5)
+        resp = httpx.get(
+            f"{settings.CITIZEN_CHANNELS_URL}/health",
+            headers=cloud_run_headers(settings.CITIZEN_CHANNELS_URL, settings.AUTHENTICATE_CLOUD_RUN),
+            timeout=1.5,
+        )
         dependency_ok = resp.status_code == 200
     except Exception:
         dependency_ok = False
@@ -79,6 +101,58 @@ def health(request: Request):
             "citizen_channels_url": settings.CITIZEN_CHANNELS_URL,
         },
     }
+
+
+@router.post("/pubsub/citizen-events", status_code=204)
+def consume_citizen_event(payload: dict, request: Request):
+    message_id = event_id = request_id = event_type = None
+    try:
+        wrapped = PubSubEnvelope.model_validate(payload)
+        message_id = wrapped.message.message_id
+        raw = base64.b64decode(wrapped.message.data, validate=True)
+        event = EventEnvelope.model_validate(json.loads(raw))
+        if event.schema_version != "1.0.0" or event.event_type not in {"request.created.v1", "request.confirmed.v1"}:
+            raise ValueError("unsupported event")
+        model = RequestCreatedData if event.event_type == "request.created.v1" else RequestConfirmedData
+        validated_data = model.model_validate(event.data)
+        event_id, event_type = event.event_id, event.event_type
+        request_id = validated_data.request_id
+    except (ValidationError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error):
+        logger.warning("pubsub_event_rejected", extra={"pubsub_message_id": message_id, "event_id": event_id, "event_type": event_type, "result": "permanent_failure"})
+        return Response(status_code=400)
+
+    ledger = request.app.state.delivery_ledger
+    try:
+        claim = ledger.begin(event_id, event_type, request_id, event.schema_version) if ledger else "acquired"
+        if claim == "duplicate":
+            logger.info("pubsub_event_processed", extra={"pubsub_message_id": message_id, "event_id": event_id, "event_type": event_type, "result": "success", "duplicate_delivery": True})
+            return Response(status_code=204)
+        if claim != "acquired":
+            return Response(status_code=503)
+        location_hint = (
+            validated_data.location.admin_hint
+            if event.event_type == "request.created.v1"
+            else validated_data.location_confirmed.admin_hint
+        )
+        request.app.state.service.normalize_request(
+            request_id,
+            force=False,
+            trace_id=event.trace_id,
+            location_hints=[location_hint] if location_hint else None,
+        )
+        if ledger:
+            ledger.complete(event_id)
+    except Exception as exc:
+        if ledger:
+            try:
+                ledger.fail(event_id, "DEPENDENCY_UNAVAILABLE")
+            except Exception:
+                pass
+        logger.warning("pubsub_event_failed", extra={"pubsub_message_id": message_id, "event_id": event_id, "event_type": event_type, "result": "transient_failure", "error_code": type(exc).__name__})
+        return Response(status_code=503)
+
+    logger.info("pubsub_event_processed", extra={"pubsub_message_id": message_id, "event_id": event_id, "event_type": event_type, "result": "success", "duplicate_delivery": False})
+    return Response(status_code=204)
 
 
 @router.post("/internal/v1/normalizations", response_model=NormalizationResponse)

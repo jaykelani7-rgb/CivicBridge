@@ -1,0 +1,5 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -f, services/citizen_channels/Dockerfile, -t, us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/civicbridge-citizen-channels:$BUILD_ID, .]
+images:
+  - us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/civicbridge-citizen-channels:$BUILD_ID

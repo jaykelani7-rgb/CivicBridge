@@ -9,6 +9,18 @@ if str(root_dir) not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from packages.cloud_runtime import BigQueryDeliveryLedger, PubSubEventBus
+from packages.event_bus import configure_event_bus
+from services.policy_impact.app.config import settings
+
+if settings.EVENT_BUS == "pubsub":
+    configure_event_bus(PubSubEventBus(settings.PUBSUB_PROJECT, {
+        "recommendation.created.v1": settings.RECOMMENDATION_TOPIC,
+        "policy.decision.recorded.v1": settings.DECISION_TOPIC,
+        "project.status.updated.v1": settings.PROJECT_TOPIC,
+        "impact.metric.updated.v1": settings.IMPACT_TOPIC,
+    }))
+
 from services.policy_impact.app.api.decisions import router as decisions_router
 from services.policy_impact.app.api.health import router as health_router
 from services.policy_impact.app.api.metrics import router as metrics_router
@@ -16,7 +28,7 @@ from services.policy_impact.app.api.milestones import router as milestones_route
 from services.policy_impact.app.api.projects import router as projects_router
 from services.policy_impact.app.api.recommendations import router as recommendations_router
 from services.policy_impact.app.api.status_summary import router as status_router
-from services.policy_impact.app.config import settings
+from services.policy_impact.app.api.pubsub import router as pubsub_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +60,11 @@ app.include_router(projects_router)
 app.include_router(milestones_router)
 app.include_router(metrics_router)
 app.include_router(status_router)
+app.include_router(pubsub_router)
+app.state.delivery_ledger = (
+    BigQueryDeliveryLedger(settings.GCP_PROJECT_ID, settings.BIGQUERY_DATASET, settings.GCP_LOCATION)
+    if settings.IDEMPOTENCY_BACKEND == "bigquery" else None
+)
 
 
 @app.get("/")
