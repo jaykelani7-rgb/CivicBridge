@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import logging
+from pathlib import Path
 from typing import Dict, List, Optional
 from packages.contracts import (
     Recommendation,
@@ -14,8 +15,10 @@ logger = logging.getLogger("policy-impact-db")
 
 
 class PolicyImpactRepository:
-    def __init__(self, db_path: str = "policy_impact.db"):
+    def __init__(self, db_path: str = "data/policy_impact.db"):
         self.db_path = db_path
+        if db_path != ":memory:":
+            Path(db_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
         self._in_memory_recommendations: Dict[str, dict] = {}
         self._in_memory_decisions: Dict[str, dict] = {}
         self._in_memory_projects: Dict[str, dict] = {}

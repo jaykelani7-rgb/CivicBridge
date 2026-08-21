@@ -12,8 +12,8 @@ from packages.contracts.citizen import (
 )
 
 class CitizenStorage:
-    def __init__(self, media_dir: str = "data/media"):
-        self.media_dir = media_dir
+    def __init__(self, media_dir: Optional[str] = None):
+        self.media_dir = media_dir or os.getenv("CITIZEN_MEDIA_DIR", "data/media")
         os.makedirs(self.media_dir, exist_ok=True)
         
         # Primary in-memory stores
