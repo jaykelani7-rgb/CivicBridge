@@ -42,7 +42,9 @@ NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST=
 NEXT_PUBLIC_DEMO_MODE=false
 ```
 
-The `NEXT_PUBLIC_FIREBASE_*` web configuration identifies the Firebase web app and is intentionally public; it is not an Admin credential. Never put service URLs, ID tokens, session cookies, private keys, or other secrets in a `NEXT_PUBLIC_*` value. Never create, download, or set `GOOGLE_APPLICATION_CREDENTIALS` to a service-account JSON key for this application.
+The six Firebase Web values identify the Firebase web app and are intentionally public; they are not Admin credentials. Despite retaining their established `NEXT_PUBLIC_FIREBASE_*` names, the browser does not read them from the compiled JavaScript bundle. The Next.js server reads them from its runtime environment, validates an explicit allowlist, and serves that allowlist from same-origin `GET /api/auth/config`. The browser fetches it once and initializes Firebase from the response. Backend URLs, credentials, tokens, cookies, service-account information, and arbitrary environment variables cannot be returned by that endpoint.
+
+Never put service URLs, ID tokens, session cookies, private keys, or other secrets in a `NEXT_PUBLIC_*` value. Never create, download, or set `GOOGLE_APPLICATION_CREDENTIALS` to a service-account JSON key for this application.
 
 `FIREBASE_SESSION_MAX_AGE_SECONDS` must remain between 300 seconds and 1,209,600 seconds (two weeks). `AUTH_ORIGIN` must be the exact externally visible origin, with scheme and optional port but no path. Email/password controls are shown only when `NEXT_PUBLIC_FIREBASE_EMAIL_PASSWORD_ENABLED=true`; leave it false unless that provider is enabled in Firebase Authentication.
 
@@ -50,12 +52,12 @@ The `NEXT_PUBLIC_FIREBASE_*` web configuration identifies the Firebase web app a
 
 These owner actions are required once for project `civicbridge-1`:
 
-1. In Firebase Console, open **Project settings > General > Your apps**. Register or select the frontend Web app and copy its Web SDK configuration into the matching `NEXT_PUBLIC_FIREBASE_*` variables. Do not commit real environment values.
+1. In Firebase Console, open **Project settings > General > Your apps**. Register or select the frontend Web app and copy its Web SDK configuration into the matching `NEXT_PUBLIC_FIREBASE_*` runtime variables. Do not commit real environment values.
 2. In **Authentication > Sign-in method**, confirm Google is enabled. Email/password is optional; enable it in the Console before changing the frontend flag to `true`.
 3. In **Authentication > Settings > Authorized domains**, add `localhost` for local development and the exact deployed frontend hostname for production.
 4. In Google Cloud IAM, attach `civicbridge-frontend@civicbridge-1.iam.gserviceaccount.com` to the frontend runtime. Grant only the Firebase Authentication permissions used for session creation, revocation checks, and logout revocation: `firebaseauth.users.createSession`, `firebaseauth.users.get`, and `firebaseauth.users.update`. Prefer a reviewed custom role containing those permissions; the predefined Firebase Authentication Admin role is broader. Do not grant service-agent roles to this runtime identity.
 
-The app signs in with the Firebase Web SDK using in-memory persistence, immediately exchanges the ID token through `POST /api/auth/session`, and signs out of the client SDK. The server stores only an `HttpOnly`, `SameSite=Lax` session cookie (also `Secure` in production). `GET /api/auth/me`, protected pages, and protected BFF endpoints verify that cookie with revocation checks and authorize only the `role` custom claim.
+The app obtains its public browser settings from `GET /api/auth/config`, signs in with the Firebase Web SDK using in-memory persistence, immediately exchanges the ID token through `POST /api/auth/session`, and signs out of the client SDK. The server stores only an `HttpOnly`, `SameSite=Lax` session cookie (also `Secure` in production). `GET /api/auth/me`, protected pages, and protected BFF endpoints verify that cookie with revocation checks and authorize only the `role` custom claim.
 
 Assigning roles is a privileged administrator operation. The script accepts one UID and one of `analyst`, `policymaker`, `admin`, or `csr_partner`; it preserves other custom claims and rejects all other roles. Run it only as an authorized project administrator using Application Default Credentials:
 
@@ -93,6 +95,22 @@ npm run dev
 
 Open `http://localhost:3000/auth` and sign in with a Firebase user that already has a valid role claim. The Citizen Portal and its submission BFF remain public. Command Center routes require `analyst`, `policymaker`, or `admin`; Policy & Impact routes require `policymaker`, `admin`, or `csr_partner`. There is no local role bypass.
 
+## Cloud Run source deployment and runtime configuration
+
+When deploying from the `frontend` directory with `gcloud run deploy --source .`, Cloud Build runs `next build` before the Cloud Run revision receives its runtime variables. The Firebase Web values therefore must not be treated as build arguments. Supply them to the Cloud Run service as ordinary runtime environment variables; `/api/auth/config` reads them when the revision handles a request:
+
+```bash
+cd frontend
+gcloud run deploy civicbridge-frontend \
+  --source . \
+  --project civicbridge-1 \
+  --region us-central1 \
+  --service-account civicbridge-frontend@civicbridge-1.iam.gserviceaccount.com \
+  --set-env-vars 'FIREBASE_PROJECT_ID=civicbridge-1,AUTH_ORIGIN=https://FRONTEND_HOST,NEXT_PUBLIC_FIREBASE_API_KEY=WEB_API_KEY,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=civicbridge-1.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=civicbridge-1,NEXT_PUBLIC_FIREBASE_APP_ID=WEB_APP_ID,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=SENDER_ID,NEXT_PUBLIC_FIREBASE_EMAIL_PASSWORD_ENABLED=false'
+```
+
+Include the existing server-only backend URLs and other required BFF settings through the deployment mechanism approved for the environment. Do not place them in `/api/auth/config`. `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST` is not returned by the endpoint and is accepted by the browser only during non-production local development on `localhost` or `127.0.0.1`.
+
 ## Cloud Run authentication and IAM
 
 For an HTTPS `*.run.app` target (or when `CLOUD_RUN_AUTH_MODE=always`), the BFF uses Application Default Credentials through `google-auth-library` to mint an ID token whose audience is the target service URL. Local HTTP URLs receive no Google token. Never download or commit a service-account JSON key.
@@ -125,7 +143,7 @@ E2E tests verify public citizen submission behavior and the unauthenticated staf
 
 1. Build and test the frontend image without embedding backend URLs.
 2. Deploy the frontend privately or publicly according to the product entry-point policy, using a dedicated runtime service account.
-3. Set the server-only service URL, Google project/location, timeout, Firebase Admin project/session/origin values, and public Firebase Web app values on the frontend service.
+3. Set the server-only service URL, Google project/location, timeout, Firebase Admin project/session/origin values, and public Firebase Web app values on the Cloud Run revision at runtime. The public values are retrieved through `/api/auth/config`; they do not need to exist during `next build`.
 4. Grant the runtime service account `roles/run.invoker` on each target backend service.
 5. Keep every backend service private and verify citizen submission plus staff-role denial/allow paths.
 

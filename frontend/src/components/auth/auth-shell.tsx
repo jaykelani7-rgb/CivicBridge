@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authApi, authKeys, type SafeStaffProfile } from "@/lib/api/auth";
 import { isApiError } from "@/lib/api/errors";
-import { browserFirebaseAuth, emailPasswordSignInEnabled, firebaseClientConfigured } from "@/lib/firebase/client";
+import { browserFirebaseAuth, runtimeFirebaseConfig } from "@/lib/firebase/client";
 
 type AuthShellProps = { returnTo?: string; reason?: string };
 const reasonCopy: Record<string, { title: string; message: string }> = {
@@ -39,8 +39,8 @@ export function AuthShell({ returnTo, reason }: AuthShellProps) {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const configured = firebaseClientConfigured();
-  const emailEnabled = emailPasswordSignInEnabled();
+  const firebaseConfig = useQuery({ queryKey: ["auth", "firebase-config"], queryFn: runtimeFirebaseConfig, retry: false, staleTime: Infinity });
+  const emailEnabled = firebaseConfig.data?.emailPasswordEnabled === true;
   const session = useQuery({ queryKey: authKeys.me, queryFn: authApi.me, retry: false, staleTime: 0 });
   const existingUser = session.data?.user;
 
@@ -81,7 +81,7 @@ export function AuthShell({ returnTo, reason }: AuthShellProps) {
     {message ? <StatusNotice title={message.title} message={message.message} warning={reason !== "signed_out"}/> : null}
     {session.isLoading ? <div aria-live="polite" className="space-y-3"><Skeleton className="h-5 w-40"/><Skeleton className="h-24"/></div> : existingUser ? <div className="space-y-4 rounded-2xl border border-success/25 bg-success/5 p-5"><div><p className="font-semibold">{existingUser.displayName ?? existingUser.email ?? "CivicBridge staff member"}</p><p className="mt-1 text-sm text-muted-foreground">Role: {existingUser.role.replaceAll("_", " ")}</p></div><div className="flex flex-wrap gap-3"><Button onClick={() => router.push(allowedDestination(existingUser, returnTo))}>Continue to workspace</Button><Button variant="outline" disabled={logoutMutation.isPending} onClick={() => logoutMutation.mutate()}>{logoutMutation.isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : <LogOut className="mr-2 h-4 w-4"/>}Sign out</Button></div></div> : <>
       {denied ? <StatusNotice title="Permission denied" message={sessionError.message} warning/> : invalid && !message ? <StatusNotice title="Session unavailable" message={sessionError.message} warning/> : null}
-      {!configured ? <StatusNotice title="Firebase web configuration required" message="Set the NEXT_PUBLIC_FIREBASE_* values in .env.local. No credentials or tokens should be committed." warning/> : <div className="space-y-4"><Button className="w-full" size="lg" disabled={pending} onClick={() => googleMutation.mutate()}>{googleMutation.isPending ? <LoaderCircle className="mr-2 h-5 w-5 animate-spin"/> : <LogIn className="mr-2 h-5 w-5"/>}Continue with Google</Button>
+      {firebaseConfig.isLoading ? <div aria-label="Loading sign-in configuration" className="space-y-3"><Skeleton className="h-11 w-full"/><Skeleton className="h-5 w-2/3"/></div> : firebaseConfig.isError ? <StatusNotice title="Authentication configuration error" message="Staff sign-in is not configured correctly. Please contact a CivicBridge administrator." warning/> : <div className="space-y-4"><Button className="w-full" size="lg" disabled={pending} onClick={() => googleMutation.mutate()}>{googleMutation.isPending ? <LoaderCircle className="mr-2 h-5 w-5 animate-spin"/> : <LogIn className="mr-2 h-5 w-5"/>}Continue with Google</Button>
         {emailEnabled ? <div className="space-y-4 border-t border-border pt-4"><p className="text-sm font-semibold">Email and password</p><div className="space-y-2"><Label htmlFor="staff-email">Email</Label><Input id="staff-email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)}/></div><div className="space-y-2"><Label htmlFor="staff-password">Password</Label><Input id="staff-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)}/></div><Button variant="outline" className="w-full" disabled={pending || !email || !password} onClick={() => emailMutation.mutate()}>{emailMutation.isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : null}Sign in with email</Button></div> : null}
       </div>}
     </>}
