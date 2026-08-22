@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { messageFromFastApi, shouldAttachIdToken } from "./cloud-run-client";
+import { copyGoogleAuthHeaders, messageFromFastApi, shouldAttachIdToken } from "./cloud-run-client";
 
 describe("Cloud Run client boundaries", () => {
   it("authenticates Cloud Run HTTPS targets but not local HTTP by default", () => {
     expect(shouldAttachIdToken("https://service-abc-uc.a.run.app", "auto")).toBe(true);
     expect(shouldAttachIdToken("http://127.0.0.1:8000", "auto")).toBe(false);
     expect(shouldAttachIdToken("https://example.com", "always")).toBe(true);
+  });
+
+  it("copies the non-enumerable authorization header returned by google-auth-library v11", () => {
+    const googleHeaders = new Headers({ authorization: "Bearer test-id-token" });
+    const outgoingHeaders = new Headers({ "X-Trace-Id": "trace-1" });
+    expect(Object.entries(googleHeaders)).toHaveLength(0);
+
+    copyGoogleAuthHeaders(outgoingHeaders, googleHeaders);
+
+    expect(outgoingHeaders.get("authorization")).toBe("Bearer test-id-token");
+    expect(outgoingHeaders.get("X-Trace-Id")).toBe("trace-1");
   });
 
   it("parses canonical and FastAPI detail errors", () => {
