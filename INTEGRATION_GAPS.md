@@ -6,7 +6,7 @@ The canonical AI Normalization service exposes internal normalization and retry 
 
 ## Staff identity configuration
 
-No Firebase Authentication or Google Identity Platform web-client configuration is committed. The frontend includes route protection and server-side role checks for `analyst`, `policymaker`, `admin`, and `csr_partner`, but production sign-in remains unavailable until the owner supplies the Firebase project/web configuration, token cookie exchange, and custom role claims. The UI no longer simulates authentication or stores passwords.
+The Firebase browser sign-in, Admin SDK ID-token exchange, revocable session cookies, logout, and custom-claim role enforcement are implemented. Production access remains unavailable until an authorized owner supplies the public Firebase web configuration, grants the documented runtime IAM permissions, sets each staff user's validated `role` custom claim, and adds the deployed hostname to Firebase Authentication's authorized domains. No credentials or role bypasses are committed.
 
 ## Citizen downstream status completeness
 

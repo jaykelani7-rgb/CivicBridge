@@ -1,15 +1,8 @@
 import type { ZodType } from "zod";
 import { ApiError } from "./errors";
 
-function developmentRoleHeaders(): HeadersInit {
-  const role = process.env.NEXT_PUBLIC_CIVICBRIDGE_DEV_ROLE;
-  return role ? { "X-CivicBridge-Dev-Role": role } : {};
-}
-
 export async function apiRequest<T>(path: string, schema: ZodType<T>, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
-  const devHeaders = developmentRoleHeaders();
-  Object.entries(devHeaders).forEach(([key, value]) => headers.set(key, value));
   if (init?.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(path, { ...init, headers });
   const payload: unknown = await response.json().catch(() => null);
