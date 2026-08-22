@@ -6,4 +6,5 @@ test("an unauthenticated visitor cannot enter the command center", async ({ page
   await expect(page).toHaveURL(/\/auth\?.*reason=authentication_required/);
   await expect(page.getByRole("heading", { name: "Sign in to a protected workspace." })).toBeVisible();
   await expect(page.getByText("Staff sign-in required")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
 });
