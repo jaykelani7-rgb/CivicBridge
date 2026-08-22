@@ -8,7 +8,7 @@ export default defineConfig({
     command: "npm run start -- --hostname 127.0.0.1 --port 3100",
     url: "http://127.0.0.1:3100",
     reuseExistingServer: true,
-    env: { ...process.env, CITIZEN_CHANNELS_URL: "http://127.0.0.1:8000", DATA_INTELLIGENCE_URL: "http://127.0.0.1:8002", POLICY_IMPACT_URL: "http://127.0.0.1:8003", STAFF_AUTH_MODE: "firebase", FIREBASE_PROJECT_ID: "e2e-placeholder" },
+    env: { ...process.env, CITIZEN_CHANNELS_URL: "http://127.0.0.1:8000", DATA_INTELLIGENCE_URL: "http://127.0.0.1:8002", POLICY_IMPACT_URL: "http://127.0.0.1:8003", FIREBASE_PROJECT_ID: "e2e-placeholder", AUTH_ORIGIN: "http://127.0.0.1:3100" },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

@@ -9,8 +9,9 @@ const schema = z.object({
   GOOGLE_CLOUD_PROJECT: z.string().optional(),
   GOOGLE_CLOUD_LOCATION: z.string().default("us-central1"),
   CLOUD_RUN_AUTH_MODE: z.enum(["auto", "always", "never"]).default("auto"),
-  STAFF_AUTH_MODE: z.enum(["firebase", "development"]).default("firebase"),
   FIREBASE_PROJECT_ID: z.string().optional(),
+  FIREBASE_SESSION_MAX_AGE_SECONDS: z.coerce.number().int().min(300).max(1_209_600).default(432_000),
+  AUTH_ORIGIN: z.string().url().optional(),
   BFF_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 });
 
