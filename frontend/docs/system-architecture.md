@@ -1,4 +1,6 @@
-# ResourceMatch System Architecture
+# Legacy ResourceMatch System Architecture (unused)
+
+> This document describes the retained `frontend/services/*` legacy stack. The canonical CivicBridge architecture is documented in `frontend/README.md` and uses the four root `services/` through Next.js BFF routes.
 
 ## Step 1 Decisions
 

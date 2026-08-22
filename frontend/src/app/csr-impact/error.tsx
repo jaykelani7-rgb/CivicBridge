@@ -26,7 +26,7 @@ export default function CSRImpactError({
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-muted-foreground">
-            The donor workspace is protected by its own route boundary, so you
+            The Policy &amp; Impact workspace is protected by its own route boundary, so you
             can retry without affecting the rest of the app.
           </p>
           <div className="rounded-2xl border border-border bg-background p-4 text-sm text-foreground/80">

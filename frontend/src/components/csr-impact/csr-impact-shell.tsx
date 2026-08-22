@@ -1,561 +1,72 @@
 "use client";
 
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { pdf } from "@react-pdf/renderer";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowRight,
-  BanknoteArrowUp,
-  Building2,
-  CheckCircle2,
-  Download,
-  LoaderCircle,
-  ReceiptText,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  WalletCards,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion, useReducedMotion } from "framer-motion";
+import { AlertTriangle, ArrowLeft, BarChart3, CheckCircle2, ClipboardCheck, FolderKanban, Plus, RefreshCcw, ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import {
-  startTransition,
-  useDeferredValue,
-  useMemo,
-  useState,
-} from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  fundingNeeds,
-  impactReceipts,
-  type FundingNeed,
-  type ImpactReceiptRecord,
-} from "./csr-impact-data";
-import { ImpactReceiptDocument } from "./impact-receipt-document";
-import { api } from "@/lib/api";
-
-const fundingBoardKey = ["csr-impact", "funding-board"];
-const receiptsKey = ["csr-impact", "receipts"];
-
-const summaryTiles = [
-  {
-    label: "Total capital allocated",
-    value: "INR 25.4L",
-    detail: "Across verified public works projects",
-    icon: WalletCards,
-  },
-  {
-    label: "Projects authorized",
-    value: "18",
-    detail: "With AI project briefs and target baseline outcomes",
-    icon: CheckCircle2,
-  },
-  {
-    label: "Average policy turnaround",
-    value: "4.8 hrs",
-    detail: "From hotspot identification to executive project approval",
-    icon: TrendingUp,
-  },
-];
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-function fundingProgress(need: FundingNeed) {
-  return Math.min(100, Math.round((need.fundedAmount / need.fundingGoal) * 100));
-}
-
-function ReceiptDownloadButton({ receipt }: { receipt: ImpactReceiptRecord }) {
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  async function handleDownload() {
-    try {
-      setIsGenerating(true);
-
-      const blob = await pdf(
-        <ImpactReceiptDocument receipt={receipt} />,
-      ).toBlob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${receipt.receiptNumber}.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-
-      toast.success("Impact receipt generated and downloaded.");
-    } catch {
-      toast.error("Receipt generation failed. Please try again.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  return (
-    <Button
-      variant="accent"
-      className="h-12 w-full sm:w-auto"
-      onClick={handleDownload}
-      disabled={isGenerating}
-    >
-      <motion.span
-        className="inline-flex items-center"
-        animate={isGenerating ? { y: [0, -1, 0] } : undefined}
-        transition={{ repeat: Number.POSITIVE_INFINITY, duration: 0.9 }}
-      >
-        {isGenerating ? (
-          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <Download className="mr-2 h-4 w-4" />
-        )}
-        {isGenerating ? "Generating receipt" : "Generate impact receipt"}
-      </motion.span>
-    </Button>
-  );
-}
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { isApiError } from "@/lib/api/errors";
+import { policyApi, policyKeys } from "@/lib/api/policy";
+import type { DevelopmentProject, Recommendation } from "@/lib/api/types";
 
 export function CSRImpactShell() {
+  const reducedMotion = useReducedMotion();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
+  const [hotspotId, setHotspotId] = useState("");
+  const [bundleId, setBundleId] = useState("");
+  const [title, setTitle] = useState("");
+  const [decisionReason, setDecisionReason] = useState("Evidence reviewed for feasibility assessment.");
+  const recommendations = useQuery({ queryKey: policyKeys.recommendations, queryFn: policyApi.recommendations });
+  const projects = useQuery({ queryKey: policyKeys.projects, queryFn: policyApi.projects });
+  const authError = [recommendations.error, projects.error].find((error) => isApiError(error) && (error.status === 401 || error.status === 403 || error.code === "AUTH_NOT_CONFIGURED"));
 
-  const { data: boardNeeds = [] } = useQuery<FundingNeed[]>({
-    queryKey: fundingBoardKey,
-    queryFn: async () => {
-      const collection = await api.getHotspots();
-      return collection.features.map((feat) => {
-        const props = feat.properties;
-        const sectorName = props.sector.charAt(0).toUpperCase() + props.sector.slice(1);
-        const goal = Math.round(props.service_gap * 2500);
-        const funded = Math.min(goal, props.request_rate * 10000);
-
-        return {
-          id: props.hotspot_id,
-          title: `${props.admin_name} ${sectorName} Rehabilitation Project`,
-          location: props.admin_name,
-          urgency: props.need_score >= 80 ? "Critical" : props.need_score >= 50 ? "High" : "Moderate",
-          category: sectorName,
-          verifiedBy: "CivicBridge Analyst Verification",
-          households: props.request_rate * 25,
-          fundingGoal: goal,
-          fundedAmount: funded,
-          eta: "Deploy within 7 days",
-          summary: `This is a verified infrastructure need in ${props.admin_name} based on ${props.request_rate} citizen requests. The current infrastructure gap is assessed at ${props.service_gap}%.`,
-          costBreakdown: [
-            { label: "Engineering works", amount: Math.round(goal * 0.6) },
-            { label: "Material logistics", amount: Math.round(goal * 0.2) },
-            { label: "Verification and safety checks", amount: Math.round(goal * 0.2) },
-          ],
-          tags: ["Verified", props.sector.toUpperCase()],
-          fundedByYou: false,
-        } as FundingNeed;
-      });
-    },
-    initialData: [],
-    placeholderData: keepPreviousData,
+  const createRecommendation = useMutation({
+    mutationFn: () => policyApi.createRecommendation({ hotspot_id: hotspotId.trim(), evidence_bundle_id: bundleId.trim(), title: title.trim() || undefined }),
+    onSuccess: async () => { toast.success("Recommendation created from the evidence bundle."); setHotspotId(""); setBundleId(""); setTitle(""); await queryClient.invalidateQueries({ queryKey: policyKeys.recommendations }); },
+    onError: (error) => toast.error(error.message),
+  });
+  const decide = useMutation({
+    mutationFn: ({ recommendationId }: { recommendationId: string }) => policyApi.decide(recommendationId, { action: "approve_for_assessment", reason: decisionReason, actor_id: "current-staff-user", actor_role: "policymaker" }),
+    onSuccess: async () => { toast.success("Policy decision recorded. No financial transaction occurred."); await queryClient.invalidateQueries({ queryKey: policyKeys.recommendations }); },
+    onError: (error) => toast.error(error.message),
+  });
+  const createProject = useMutation({
+    mutationFn: (recommendation: Recommendation) => policyApi.createProject({ recommendation_id: recommendation.recommendation_id, title: recommendation.title }),
+    onSuccess: async () => { toast.success("Development project candidate created."); await queryClient.invalidateQueries({ queryKey: policyKeys.projects }); },
+    onError: (error) => toast.error(error.message),
   });
 
-  const { data: receipts = [] } = useQuery({
-    queryKey: receiptsKey,
-    queryFn: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      return impactReceipts;
-    },
-    initialData: impactReceipts,
-    placeholderData: keepPreviousData,
-  });
+  return <main className="min-h-screen bg-[linear-gradient(180deg,#f6f4ef_0%,#eff2e7_40%,#f4eee3_100%)] px-4 py-5">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <motion.header initial={reducedMotion ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="rounded-[28px] border border-border bg-card/95 p-6 shadow-soft"><div className="flex flex-wrap items-start justify-between gap-4"><div><Badge variant="accent">Policymaker workspace</Badge><h1 className="mt-4 font-heading text-4xl font-black">Policy &amp; Impact</h1><p className="mt-3 max-w-3xl text-muted-foreground">Create evidence-backed recommendations, record human decisions, create development projects, and inspect real impact metrics.</p></div><Button asChild variant="outline"><Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Home</Link></Button></div></motion.header>
 
-  const pledgeMutation = useMutation({
-    mutationFn: async ({ id }: { id: string }) => {
-      const rec = await api.generateRecommendation(id);
-      await api.submitPolicyDecision(
-        rec.recommendation_id,
-        "approve",
-        "Funded and approved via CSR Impact Console",
-        "csr_donor"
-      );
-      return id;
-    },
-    onMutate: async ({ id }) => {
-      await queryClient.cancelQueries({ queryKey: fundingBoardKey });
-      const previous = queryClient.getQueryData<FundingNeed[]>(fundingBoardKey) ?? [];
+      {authError && isApiError(authError) ? <State icon={<ShieldAlert className="h-6 w-6"/>} title="Staff access unavailable" message={authError.message} retry={() => { void recommendations.refetch(); void projects.refetch(); }}/> : <>
+        <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+          <Card><CardHeader><Badge variant="secondary" className="w-fit">New recommendation</Badge><CardTitle>Create from bounded evidence</CardTitle><CardDescription>Use the exact hotspot and evidence bundle IDs from Data Intelligence. The Policy service validates citations.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="hotspot-id">Hotspot ID</Label><Input id="hotspot-id" value={hotspotId} onChange={(e) => setHotspotId(e.target.value)} /></div><div className="space-y-2"><Label htmlFor="bundle-id">Evidence Bundle ID</Label><Input id="bundle-id" value={bundleId} onChange={(e) => setBundleId(e.target.value)} /></div><div className="space-y-2"><Label htmlFor="rec-title">Optional title</Label><Input id="rec-title" value={title} onChange={(e) => setTitle(e.target.value)} /></div><Button disabled={!hotspotId.trim() || !bundleId.trim() || createRecommendation.isPending} onClick={() => createRecommendation.mutate()}><Plus className="mr-2 h-4 w-4"/>{createRecommendation.isPending ? "Creating…" : "Create recommendation"}</Button></CardContent></Card>
+          <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><Badge variant="info">Human governance</Badge><CardTitle className="mt-3">Recommendations</CardTitle></div><Button variant="ghost" onClick={() => void recommendations.refetch()}><RefreshCcw className={`mr-2 h-4 w-4 ${recommendations.isFetching ? "animate-spin" : ""}`}/>Refresh</Button></div></CardHeader><CardContent className="space-y-4">{recommendations.isLoading ? <Loading/> : recommendations.isError ? <InlineError error={recommendations.error} retry={() => void recommendations.refetch()}/> : recommendations.data?.length ? <><div className="space-y-2"><Label htmlFor="decision-reason">Decision justification</Label><Textarea id="decision-reason" value={decisionReason} onChange={(e) => setDecisionReason(e.target.value)} /></div>{recommendations.data.map((item) => <RecommendationCard key={item.recommendation_id} item={item} deciding={decide.isPending} creating={createProject.isPending} decide={() => decide.mutate({ recommendationId: item.recommendation_id })} createProject={() => createProject.mutate(item)}/>)}</> : <Empty title="No recommendations" message="Create one from a real hotspot evidence bundle. No sample recommendations are substituted."/>}</CardContent></Card>
+        </div>
 
-      queryClient.setQueryData<FundingNeed[]>(
-        fundingBoardKey,
-        previous.map((need) =>
-          need.id === id
-            ? {
-                ...need,
-                fundedByYou: true,
-                fundedAmount: need.fundingGoal,
-              }
-            : need,
-        ),
-      );
+        <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><Badge variant="success">Development projects</Badge><CardTitle className="mt-3">Project impact records</CardTitle><CardDescription>Metrics are loaded exactly as recorded by the Policy + Impact service.</CardDescription></div><Button variant="outline" disabled title="PDF export requires a complete real-data report contract.">Export unavailable</Button></div></CardHeader><CardContent>{projects.isLoading ? <Loading/> : projects.isError ? <InlineError error={projects.error} retry={() => void projects.refetch()}/> : projects.data?.length ? <div className="grid gap-4 md:grid-cols-2">{projects.data.map((project) => <ProjectCard key={project.project_id} project={project}/>)}</div> : <Empty title="No development projects" message="Approve a recommendation for assessment, then create a project candidate. CivicBridge does not allocate funds."/>}</CardContent></Card>
+      </>}
 
-      return { previous };
-    },
-    onSuccess: () => {
-      toast.success("Funding commitment reserved, project recommendation approved, and registered in backend!");
-    },
-    onError: (_error, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(fundingBoardKey, context.previous);
-      }
-      toast.error("Funding reservation failed. The board was restored.");
-    },
-  });
-
-  const filteredNeeds = useMemo(() => {
-    if (!deferredSearch.trim()) {
-      return boardNeeds;
-    }
-
-    const query = deferredSearch.toLowerCase();
-    return boardNeeds.filter((need) =>
-      [need.title, need.location, need.category, need.summary, need.tags.join(" ")]
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [boardNeeds, deferredSearch]);
-
-  return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f6f4ef_0%,#eff2e7_40%,#f4eee3_100%)] text-foreground">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-        <motion.header
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="rounded-[32px] border border-border bg-[radial-gradient(circle_at_top_left,rgba(107,142,35,0.18),transparent_28%),radial-gradient(circle_at_80%_10%,rgba(63,81,181,0.14),transparent_24%),linear-gradient(180deg,#ffffff,#faf7f1)] p-5 shadow-soft sm:p-6"
-        >
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">Public Infrastructure Portal</Badge>
-                <Badge variant="accent">Impact-ready governance</Badge>
-                <Badge variant="warning">Verified projects only</Badge>
-              </div>
-              <div className="space-y-3">
-                <h1 className="max-w-4xl font-heading text-4xl font-black tracking-tight text-foreground sm:text-5xl">
-                  Authorize verified projects and download policymaker-ready impact certificates.
-                </h1>
-                <p className="max-w-3xl text-base text-muted-foreground sm:text-lg">
-                  A professional government & partner workspace for hotspot funding allocation,
-                  exact cost breakdowns, and transparent tracking of baseline-to-target outcomes.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button asChild variant="outline" className="h-12">
-                <Link href="/command-center">
-                  View analyst console
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button className="h-12 bg-accent text-accent-foreground hover:bg-accent/90">
-                <Building2 className="mr-2 h-4 w-4" />
-                Export alignment report
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {summaryTiles.map((tile, index) => {
-              const Icon = tile.icon;
-              return (
-                <motion.div
-                  key={tile.label}
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.08 + index * 0.06, duration: 0.35 }}
-                  className="rounded-[24px] bg-secondary p-5 text-secondary-foreground shadow-[0_20px_50px_-30px_rgba(107,142,35,0.85)]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-white/85">
-                      {tile.label}
-                    </p>
-                    <Icon className="h-5 w-5 text-white/90" />
-                  </div>
-                  <p className="mt-5 text-4xl font-black text-white">{tile.value}</p>
-                  <p className="mt-3 text-sm leading-relaxed text-white/82">
-                    {tile.detail}
-                  </p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.header>
-
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.95fr)]">
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.06, duration: 0.4 }}
-          >
-            <Card className="bg-card/95">
-              <CardHeader className="pb-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <Badge variant="secondary">Projects Board</Badge>
-                    <CardTitle className="mt-4 text-3xl">
-                      Verified hotspots with baseline cost assessments
-                    </CardTitle>
-                    <CardDescription className="mt-2 text-base">
-                      Review live priorities and authorize funding directly against needs verified by the CivicBridge backend.
-                    </CardDescription>
-                  </div>
-
-                  <div className="relative w-full max-w-sm">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={search}
-                      onChange={(event) =>
-                        startTransition(() => setSearch(event.target.value))
-                      }
-                      placeholder="Search need, district, or category"
-                      className="pl-11"
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {filteredNeeds.map((need) => {
-                  const remaining = need.fundingGoal - need.fundedAmount;
-                  const progress = fundingProgress(need);
-
-                  return (
-                    <div
-                      key={need.id}
-                      className="rounded-[24px] border border-border bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                    >
-                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap gap-2">
-                            <Badge variant="default">{need.urgency} urgency</Badge>
-                            <Badge variant="secondary">{need.category}</Badge>
-                            {need.tags.map((tag) => (
-                              <Badge
-                                key={tag}
-                                variant="accent"
-                                className="normal-case tracking-normal"
-                              >
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                          <div>
-                            <h3 className="font-heading text-2xl font-bold text-foreground">
-                              {need.title}
-                            </h3>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {need.location} • {need.verifiedBy} • {need.eta}
-                            </p>
-                          </div>
-                          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-                            {need.summary}
-                          </p>
-                        </div>
-
-                        <div className="rounded-[20px] border border-border bg-background p-4 xl:min-w-[240px]">
-                          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Allocation status
-                          </p>
-                          <p className="mt-3 text-3xl font-black text-foreground">
-                            {formatCurrency(remaining)}
-                          </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            Remaining of {formatCurrency(need.fundingGoal)}
-                          </p>
-                          <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted">
-                            <motion.div
-                              className="h-full rounded-full bg-secondary"
-                              initial={false}
-                              animate={{ width: `${progress}%` }}
-                              transition={{ duration: 0.35 }}
-                            />
-                          </div>
-                          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
-                            {progress}% allocated
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-                        <div className="rounded-[20px] border border-border bg-background p-4">
-                          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Cost breakdown
-                          </p>
-                          <div className="mt-3 space-y-3">
-                            {need.costBreakdown.map((item) => (
-                              <div
-                                key={item.label}
-                                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-3"
-                              >
-                                <span className="text-sm text-foreground">{item.label}</span>
-                                <span className="text-sm font-bold text-foreground">
-                                  {formatCurrency(item.amount)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col justify-between rounded-[20px] border border-border bg-background p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                              <ShieldCheck className="h-4 w-4 text-secondary" />
-                              Verification highlights
-                            </div>
-                            <p className="text-sm leading-relaxed text-muted-foreground">
-                              Verified for {need.households} citizens with a field
-                              confirmation trail and direct delivery path.
-                            </p>
-                          </div>
-
-                          <Button
-                            className={need.fundedByYou ? "bg-secondary hover:bg-secondary/90" : ""}
-                            onClick={() => pledgeMutation.mutate({ id: need.id })}
-                            disabled={pledgeMutation.isPending}
-                          >
-                            {pledgeMutation.isPending ? (
-                              <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                            ) : need.fundedByYou ? (
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
-                            ) : (
-                              <BanknoteArrowUp className="mr-2 h-4 w-4" />
-                            )}
-                            {need.fundedByYou ? "Project authorized" : "Authorize & Allocate Funding"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.aside
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12, duration: 0.4 }}
-            className="space-y-6"
-          >
-            <Card className="bg-card/95">
-              <CardHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <Badge variant="accent">Impact receipts</Badge>
-                    <CardTitle className="mt-4 text-3xl">
-                      Download board-ready PDFs
-                    </CardTitle>
-                  </div>
-                  <div className="rounded-full bg-accent/10 p-3 text-accent">
-                    <ReceiptText className="h-5 w-5" />
-                  </div>
-                </div>
-                <CardDescription className="mt-2 text-base">
-                  Each receipt ties the original need to deployed resources and
-                  verified outcomes for leadership review.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <AnimatePresence initial={false}>
-                  {receipts.map((receipt) => (
-                    <motion.div
-                      key={receipt.id}
-                      layout
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="rounded-[24px] border border-border bg-white p-4 shadow-sm"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="secondary">{receipt.receiptNumber}</Badge>
-                        <Badge variant="accent">{receipt.date}</Badge>
-                      </div>
-                      <h3 className="mt-4 font-heading text-xl font-bold text-foreground">
-                        {receipt.needTitle}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {receipt.location} • {formatCurrency(receipt.amount)}
-                      </p>
-                      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                        {receipt.verifiedOutcome}
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {receipt.resourcesDeployed.slice(0, 3).map((item) => (
-                          <Badge
-                            key={item}
-                            variant="secondary"
-                            className="normal-case tracking-normal"
-                          >
-                            {item}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="mt-4">
-                        <ReceiptDownloadButton receipt={receipt} />
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[linear-gradient(180deg,#ffffff,#f6f8f1)]">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-primary/10 p-3 text-primary">
-                    <Sparkles className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-2xl">Why finance teams like this</CardTitle>
-                    <CardDescription>
-                      The portal keeps funding clarity and reporting quality high.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  "Every listed need is verified before it appears on the board.",
-                  "Cost lines make committee approval faster and less ambiguous.",
-                  "Receipt PDFs can be attached directly to board and audit packs.",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4"
-                  >
-                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
-                    <p className="text-sm leading-relaxed text-foreground">{item}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </motion.aside>
-        </section>
-      </div>
-    </main>
-  );
+      <Card className="border-warning/30 bg-warning/5"><CardContent className="flex items-start gap-3 p-5"><AlertTriangle className="mt-0.5 h-5 w-5 text-warning"/><div><p className="font-semibold">Governance actions, not payments</p><p className="text-sm text-muted-foreground">This workspace records recommendations, policy decisions, projects, and measurements. It does not process or imply financial transactions, funding totals, verification receipts, or fabricated cost estimates.</p></div></CardContent></Card>
+    </div>
+  </main>;
 }
+
+function RecommendationCard({ item, decide, createProject, deciding, creating }: { item: Recommendation; decide: () => void; createProject: () => void; deciding: boolean; creating: boolean }) { return <article className="rounded-2xl border border-border bg-background p-4"><div className="flex flex-wrap items-center gap-2"><Badge variant="accent">{item.status.replaceAll("_", " ")}</Badge>{item.ai_draft ? <Badge variant="info">AI draft</Badge> : <Badge variant="secondary">Human draft</Badge>}</div><h3 className="mt-3 text-xl font-bold">{item.title}</h3><p className="mt-2 text-sm text-muted-foreground">{item.problem}</p><div className="mt-3 rounded-xl bg-muted/40 p-3 text-sm"><p className="font-semibold">Proposed intervention</p><p className="mt-1 text-muted-foreground">{item.proposed_intervention}</p></div><p className="mt-3 text-xs text-muted-foreground">Confidence {(item.confidence * 100).toFixed(0)}% · {item.supporting_evidence_ids.length} cited evidence IDs</p><div className="mt-4 flex flex-wrap gap-2"><Button size="sm" disabled={deciding || item.human_approved} onClick={decide}><ClipboardCheck className="mr-2 h-4 w-4"/>{item.human_approved ? "Decision approved" : "Approve for assessment"}</Button><Button size="sm" variant="outline" disabled={creating || !item.human_approved} onClick={createProject}><FolderKanban className="mr-2 h-4 w-4"/>Create development project</Button></div></article>; }
+
+function ProjectCard({ project }: { project: DevelopmentProject }) { const metrics = useQuery({ queryKey: policyKeys.metrics(project.project_id), queryFn: () => policyApi.metrics(project.project_id) }); return <article className="rounded-2xl border border-border bg-background p-5"><div className="flex flex-wrap items-center justify-between gap-2"><Badge variant="secondary">{project.status.replaceAll("_", " ")}</Badge><span className="text-xs text-muted-foreground">{project.country_code} · {project.sector}</span></div><h3 className="mt-3 text-xl font-bold">{project.title}</h3><p className="mt-1 text-xs text-muted-foreground">Project {project.project_id.slice(0, 8)} · Recommendation {project.recommendation_id.slice(0, 8)}</p><div className="mt-4"><p className="flex items-center gap-2 font-semibold"><BarChart3 className="h-4 w-4 text-accent"/>Impact metrics</p>{metrics.isLoading ? <Skeleton className="mt-2 h-20"/> : metrics.isError ? <InlineError error={metrics.error} retry={() => void metrics.refetch()}/> : metrics.data?.length ? <div className="mt-2 space-y-2">{metrics.data.map((metric) => <div key={metric.metric_id} className="rounded-xl bg-muted/40 p-3"><div className="flex justify-between gap-2 text-sm font-semibold"><span>{metric.metric_code.replaceAll("_", " ")}</span><span>{metric.current} {metric.unit}</span></div><p className="mt-1 text-xs text-muted-foreground">Baseline {metric.baseline} · Target {metric.target} · Confidence {(metric.confidence * 100).toFixed(0)}% · Source {metric.source_id}</p></div>)}</div> : <p className="mt-2 text-sm text-muted-foreground">No impact measurements recorded.</p>}</div></article>; }
+
+function Loading() { return <div className="space-y-3"><Skeleton className="h-28"/><Skeleton className="h-28"/></div>; }
+function Empty({ title, message }: { title: string; message: string }) { return <div className="rounded-2xl border border-dashed border-border p-6 text-center"><CheckCircle2 className="mx-auto h-6 w-6 text-muted-foreground"/><p className="mt-3 font-semibold">{title}</p><p className="mt-1 text-sm text-muted-foreground">{message}</p></div>; }
+function InlineError({ error, retry }: { error: Error; retry: () => void }) { return <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4"><p className="font-semibold">Request failed</p><p className="text-sm text-muted-foreground">{isApiError(error) ? error.message : "The service could not be reached."}</p><Button size="sm" variant="outline" className="mt-2" onClick={retry}>Retry</Button></div>; }
+function State({ icon, title, message, retry }: { icon: React.ReactNode; title: string; message: string; retry: () => void }) { return <Card><CardContent className="p-8"><div className="text-warning">{icon}</div><h2 className="mt-4 text-2xl font-bold">{title}</h2><p className="mt-2 text-muted-foreground">{message}</p><Button className="mt-4" onClick={retry}>Retry</Button></CardContent></Card>; }

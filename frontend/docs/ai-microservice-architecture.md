@@ -1,4 +1,6 @@
-# ResourceMatch AI Microservice Architecture
+# Legacy ResourceMatch AI Microservice Architecture (unused)
+
+> This document is retained for teammate review only. The frontend does not integrate this OCR/Whisper service; canonical AI Normalization is under the repository root.
 
 ## Purpose
 

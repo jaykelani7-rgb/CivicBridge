@@ -45,27 +45,22 @@ export const informationArchitecture = [
   {
     label: "Home",
     href: "#home",
-    description: "Hero, mission framing, and primary volunteer CTA.",
+    description: "Hero, mission framing, and primary citizen CTA.",
   },
   {
     label: "Browse",
     href: "#browse",
-    description: "Search and filter live opportunities without losing context.",
+    description: "Search and filter live hotspots without losing context.",
   },
   {
     label: "Impact",
     href: "#impact",
-    description: "Proof points, testimonials, and measurable outcomes.",
+    description: "Backend-recorded projects and measurable outcomes.",
   },
   {
     label: "Join",
     href: "#join",
-    description: "Separate onboarding paths for volunteers and NGO teams.",
-  },
-  {
-    label: "Contact",
-    href: "#contact",
-    description: "Trust, support, and follow-up details.",
+    description: "Separate entry paths for citizens, analysts, and policymakers.",
   },
 ] as const;
 

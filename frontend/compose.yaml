@@ -1,5 +1,6 @@
 name: resourcematch-dev
 
+# LEGACY/UNUSED ResourceMatch stack. See frontend/README.md for canonical CivicBridge services.
 services:
   postgres:
     image: postgis/postgis:16-3.4

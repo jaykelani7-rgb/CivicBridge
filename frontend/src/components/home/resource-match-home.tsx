@@ -8,11 +8,9 @@ import {
   HandHeart,
   HeartHandshake,
   Menu,
-  PhoneCall,
   Search,
   ShieldCheck,
   Sparkles,
-  Users,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,10 +23,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionShell } from "@/components/ui/section-shell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
-  homeStats,
   howItWorks,
   onboardingPanels,
-  testimonials,
 } from "./home-data";
 import { HotspotBrowser } from "./opportunity-browser";
 
@@ -226,16 +222,8 @@ export function CivicBridgeHome() {
                 </Button>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
-                {homeStats.map((stat) => (
-                  <div
-                    key={stat.label}
-                    className="rounded-[20px] border border-border/80 bg-card/90 p-4 shadow-sm"
-                  >
-                    <p className="text-2xl font-black text-foreground">{stat.value}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
-                  </div>
-                ))}
+              <div className="rounded-[20px] border border-border/80 bg-card/90 p-4 text-sm text-muted-foreground shadow-sm">
+                Aggregate platform statistics will appear when a canonical summary endpoint is available. No demonstration totals are shown in production.
               </div>
             </div>
 
@@ -348,46 +336,10 @@ export function CivicBridgeHome() {
             <div className="grid gap-4">
               <Card className="bg-[linear-gradient(135deg,rgba(107,142,35,0.12),rgba(255,255,255,0.92))]">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-2xl">
-                    <Users className="h-5 w-5 text-secondary" />
-                    CivicBridge Impact
-                  </CardTitle>
+                  <CardTitle className="text-2xl">CivicBridge Impact</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-border bg-card p-4">
-                    <p className="text-3xl font-black text-foreground">142k+</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Multilingual complaints processed
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-border bg-card p-4">
-                    <p className="text-3xl font-black text-foreground">38</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Active hotspots mapped
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-border bg-card p-4">
-                    <p className="text-3xl font-black text-foreground">96%</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      AI structured field accuracy verified
-                    </p>
-                  </div>
-                </CardContent>
+                <CardContent><p className="text-muted-foreground">Open Policy &amp; Impact to inspect backend-recorded project baselines, targets, current measurements, provenance, and confidence. Unsupported national totals and accuracy claims are intentionally omitted.</p></CardContent>
               </Card>
-
-              {testimonials.map((item) => (
-                <Card key={item.name}>
-                  <CardContent className="space-y-4 p-6">
-                    <p className="text-lg leading-relaxed text-foreground">
-                      “{item.quote}”
-                    </p>
-                    <div>
-                      <p className="font-semibold text-foreground">{item.name}</p>
-                      <p className="text-sm text-muted-foreground">{item.role}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
             </div>
 
             <Card className="overflow-hidden bg-[linear-gradient(180deg,rgba(63,81,181,0.1),rgba(255,255,255,0.96))]">
@@ -440,39 +392,6 @@ export function CivicBridgeHome() {
           </div>
         </SectionShell>
 
-        <SectionShell
-          id="contact"
-          eyebrow="Support and trust"
-          title="Need admin assistance?"
-          description="Connecting municipal administrators and regional agencies."
-        >
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div className="space-y-3">
-              <p className="max-w-2xl text-base text-muted-foreground">
-                Contact the CivicBridge administration team for country configurations,
-                analyst verification, or policymaking questions.
-              </p>
-              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                <span className="inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2">
-                  <PhoneCall className="h-4 w-4 text-accent" />
-                  +91 80 5555 2400
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2">
-                  <ShieldCheck className="h-4 w-4 text-secondary" />
-                  support@civicbridge.gov
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button asChild variant="outline">
-                <Link href="/volunteer">Intake portal</Link>
-              </Button>
-              <Button asChild variant="accent">
-                <Link href="/csr-impact">Impact dashboard</Link>
-              </Button>
-            </div>
-          </div>
-        </SectionShell>
       </div>
 
       <footer className="border-t border-border/70 bg-card/70">
@@ -488,9 +407,6 @@ export function CivicBridgeHome() {
             <Link href="/command-center" className="hover:text-foreground">
               Login
             </Link>
-            <a href="mailto:support@civicbridge.gov" className="hover:text-foreground">
-              Contact
-            </a>
           </div>
         </div>
       </footer>

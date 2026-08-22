@@ -21,12 +21,12 @@ export default function VolunteerError({
             <Smartphone className="h-6 w-6" />
           </div>
           <CardTitle className="text-3xl">
-            The field app hit a sync issue.
+            The Citizen Portal hit a sync issue.
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-muted-foreground">
-            The mobile workspace stayed isolated so you can retry without losing
+            The public request workspace stayed isolated so you can retry without losing
             the rest of the app state.
           </p>
           <div className="rounded-2xl border border-border bg-background p-4 text-sm text-foreground/80">
@@ -34,7 +34,7 @@ export default function VolunteerError({
           </div>
           <Button onClick={reset}>
             <RefreshCcw className="mr-2 h-4 w-4" />
-            Retry field app
+            Retry Citizen Portal
           </Button>
         </CardContent>
       </Card>
