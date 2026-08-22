@@ -425,13 +425,13 @@ export function CivicBridgeHome() {
         >
           <div className="grid gap-4 lg:grid-cols-3">
             {onboardingPanels.map((panel) => (
-              <Card key={panel.title} className="h-full">
+              <Card key={panel.title} className="flex flex-col h-full">
                 <CardHeader className="space-y-4">
                   <CardTitle className="text-2xl">{panel.title}</CardTitle>
                 </CardHeader>
-                <CardContent className="flex h-full flex-col justify-between gap-6">
+                <CardContent className="flex flex-1 flex-col justify-between gap-6">
                   <p className="text-base text-muted-foreground">{panel.description}</p>
-                  <Button asChild className="w-full sm:w-auto">
+                  <Button asChild className="w-full">
                     <Link href={panel.href}>{panel.cta}</Link>
                   </Button>
                 </CardContent>
