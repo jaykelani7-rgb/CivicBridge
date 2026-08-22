@@ -1,0 +1,101 @@
+name: resourcematch-dev
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: resourcematch-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-resourcematch}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-resourcematch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-microservice:
+    build:
+      context: .
+      dockerfile: services/ai-microservice/Dockerfile
+      target: dev
+    container_name: resourcematch-ai-microservice
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      RESOURCE_MATCH_ENV: ${RESOURCE_MATCH_ENV:-development}
+      RESOURCE_MATCH_API_KEY: ${RESOURCE_MATCH_API_KEY:-local-dev-key}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/resourcematch}
+      OCR_CONFIDENCE_THRESHOLD: ${OCR_CONFIDENCE_THRESHOLD:-0.85}
+      DECAY_INTERVAL_MINUTES: ${DECAY_INTERVAL_MINUTES:-15}
+    working_dir: /app/services/ai-microservice
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/').status == 200 else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - ./services/ai-microservice:/app/services/ai-microservice
+    ports:
+      - "8000:8000"
+
+  core-api:
+    build:
+      context: .
+      dockerfile: services/core-api/Dockerfile
+      target: dev
+      args:
+        DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/resourcematch}
+    container_name: resourcematch-core-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-microservice:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/resourcematch}
+      AI_MICROSERVICE_BASE_URL: ${AI_MICROSERVICE_BASE_URL:-http://ai-microservice:8000}
+      RESOURCE_MATCH_INTERNAL_API_KEY: ${RESOURCE_MATCH_INTERNAL_API_KEY:-local-dev-key}
+    working_dir: /app/services/core-api
+    command: ["npm", "run", "start:dev"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - ./services/core-api:/app/services/core-api
+      - ./prisma:/app/prisma
+      - core-api-node-modules:/app/services/core-api/node_modules
+    ports:
+      - "4000:4000"
+
+volumes:
+  postgres-data:
+  core-api-node-modules:

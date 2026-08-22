@@ -196,7 +196,6 @@ def get_request_status(id: str):
         
     ai = db.request_ai_labels.get(id, {})
     
-    # Render citizen-safe model
     return {
         "request_id": req["request_id"],
         "status": req["processing_status"],
@@ -204,6 +203,7 @@ def get_request_status(id: str):
         "channel": req["channel"],
         "category": ai.get("category", "other"),
         "summary": ai.get("summary", "Summarizing request..."),
+        "urgency": ai.get("urgency", "medium"),
         "pii_masked": True
     }
 

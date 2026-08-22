@@ -1,0 +1,13 @@
+.git
+.gitignore
+.next
+node_modules
+services/core-api/node_modules
+services/core-api/dist
+services/core-api/.ts-node
+services/ai-microservice/.venv
+services/ai-microservice/__pycache__
+**/__pycache__
+**/.pytest_cache
+.DS_Store
+tmp

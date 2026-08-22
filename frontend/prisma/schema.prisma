@@ -1,0 +1,417 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+enum UserRole {
+  ADMIN
+  COORDINATOR
+  VOLUNTEER
+  FIELD_WORKER
+  CSR_DONOR
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum OrganizationType {
+  NGO
+  CORPORATE
+  DONOR_NETWORK
+}
+
+enum NeedSource {
+  WHATSAPP
+  VOICE
+  OCR
+  MANUAL
+}
+
+enum NeedStatus {
+  NEW
+  TRIAGED
+  VERIFIED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+  DUPLICATE
+  ARCHIVED
+}
+
+enum VolunteerStatus {
+  AVAILABLE
+  ASSIGNED
+  OFFLINE
+  RESTING
+  UNAVAILABLE
+}
+
+enum MediaType {
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  IN_TRANSIT
+  ON_SITE
+  COMPLETED
+  CANCELED
+}
+
+enum DonationType {
+  MONETARY
+  IN_KIND
+  MATCHED_GIFT
+}
+
+enum DonationStatus {
+  PENDING
+  AUTHORIZED
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum ReceiptStatus {
+  PENDING
+  GENERATED
+  FAILED
+}
+
+model Organization {
+  id                 String   @id @default(uuid()) @db.Uuid
+  type               OrganizationType
+  name               String
+  legalName          String?
+  registrationNumber String?
+  taxId              String?
+  website            String?
+  email              String?
+  phone              String?
+  countryCode        String?  @db.VarChar(2)
+  metadata           Json?
+  createdAt          DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(6)
+
+  users     User[]
+  needs     Need[]
+  donations Donation[]
+
+  @@index([type], map: "organizations_type_idx")
+  @@map("organizations")
+}
+
+model User {
+  id             String     @id @default(uuid()) @db.Uuid
+  organizationId String?    @db.Uuid
+  role           UserRole
+  status         UserStatus @default(ACTIVE)
+  firstName      String
+  lastName       String?
+  displayName    String?
+  email          String     @unique
+  phone          String?    @unique
+  passwordHash   String?
+  avatarUrl      String?
+  timezone       String?
+  lastLoginAt    DateTime?  @db.Timestamptz(6)
+  createdAt      DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime   @updatedAt @db.Timestamptz(6)
+
+  organization       Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  volunteerProfile   VolunteerProfile?
+  donorProfile       CSRDonorProfile?
+  createdNeeds       Need[]              @relation("NeedCreatedBy")
+  reportedNeeds      NeedReport[]        @relation("NeedReportedBy")
+  reviewedExtractions DocumentExtraction[] @relation("ExtractionReviewedBy")
+  assignmentsCreated NeedAssignment[]    @relation("AssignmentCreatedBy")
+  donations          Donation[]          @relation("DonationDonor")
+
+  @@index([organizationId], map: "users_organization_id_idx")
+  @@index([role, status], map: "users_role_status_idx")
+  @@map("users")
+}
+
+model CSRDonorProfile {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @db.Uuid
+  companyName     String?
+  department      String?
+  designation     String?
+  billingEmail    String?
+  defaultCurrency String   @default("USD") @db.VarChar(3)
+  focusAreas      String[]
+  billingAddress  Json?
+  metadata        Json?
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyName], map: "csr_donor_profiles_company_name_idx")
+  @@index([focusAreas], type: Gin, map: "csr_donor_profiles_focus_areas_gin_idx")
+  @@map("csr_donor_profiles")
+}
+
+model VolunteerProfile {
+  id                 String          @id @default(uuid()) @db.Uuid
+  userId             String          @unique @db.Uuid
+  bio                String?
+  skills             String[]
+  languages          String[]
+  currentStatus      VolunteerStatus @default(AVAILABLE)
+  availabilityNote   String?
+  lastKnownLocation  Unsupported("geography(Point, 4326)")?
+  lastLocationAt     DateTime?       @db.Timestamptz(6)
+  maxTravelRadiusKm  Int?            @default(25)
+  onboardingComplete Boolean         @default(false)
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  metadata           Json?
+  createdAt          DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(6)
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments      NeedAssignment[] @relation("AssignmentAssignee")
+  buddyAssignments NeedAssignment[] @relation("AssignmentBuddy")
+
+  @@index([currentStatus], map: "volunteer_profiles_current_status_idx")
+  @@index([skills], type: Gin, map: "volunteer_profiles_skills_gin_idx")
+  @@index([languages], type: Gin, map: "volunteer_profiles_languages_gin_idx")
+  @@index([lastKnownLocation], type: Gist, map: "volunteer_profiles_location_gist_idx")
+  @@map("volunteer_profiles")
+}
+
+model Need {
+  id               String                          @id @default(uuid()) @db.Uuid
+  organizationId   String?                         @db.Uuid
+  createdByUserId  String?                         @db.Uuid
+  primarySource    NeedSource
+  title            String
+  summary          String?
+  description      String?
+  resourceCategory String?
+  tags             String[]
+  status           NeedStatus                      @default(NEW)
+  urgencyScore     Decimal                         @db.Decimal(5, 2)
+  heatScore        Decimal                         @default(0) @db.Decimal(6, 2)
+  beneficiaryCount Int?
+  autoFlagged      Boolean                         @default(false)
+  autoFlagReasons  Json?
+  location         Unsupported("geography(Point, 4326)")
+  placeName        String?
+  adminArea        String?
+  postalCode       String?
+  countryCode      String?                         @db.VarChar(2)
+  sourceMetadata   Json?
+  latestActivityAt DateTime?                       @db.Timestamptz(6)
+  reportedAt       DateTime                        @default(now()) @db.Timestamptz(6)
+  resolvedAt       DateTime?                       @db.Timestamptz(6)
+  createdAt        DateTime                        @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime                        @updatedAt @db.Timestamptz(6)
+
+  organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdBy    User?            @relation("NeedCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  reports      NeedReport[]
+  media        NeedMedia[]
+  assignments  NeedAssignment[]
+  donations    Donation[]
+  insight      NeedInsight?
+
+  @@index([organizationId], map: "needs_organization_id_idx")
+  @@index([createdByUserId], map: "needs_created_by_user_id_idx")
+  @@index([status], map: "needs_status_idx")
+  @@index([primarySource, status], map: "needs_primary_source_status_idx")
+  @@index([status, heatScore(sort: Desc)], map: "needs_status_heat_score_idx")
+  @@index([urgencyScore(sort: Desc)], map: "needs_urgency_score_idx")
+  @@index([reportedAt], map: "needs_reported_at_idx")
+  @@index([location], type: Gist, map: "needs_location_gist_idx")
+  @@map("needs")
+}
+
+model NeedReport {
+  id                     String                          @id @default(uuid()) @db.Uuid
+  needId                 String?                         @db.Uuid
+  reportedByUserId       String?                         @db.Uuid
+  source                 NeedSource
+  sourceMessageId        String?
+  externalConversationId String?
+  rawText                String?
+  normalizedText         String?
+  transcriptText         String?
+  location               Unsupported("geography(Point, 4326)")?
+  placeName              String?
+  confidenceScore        Decimal?                        @db.Decimal(5, 2)
+  needsReview            Boolean                         @default(false)
+  reviewStatus           ReviewStatus                    @default(PENDING)
+  submittedAt            DateTime                        @default(now()) @db.Timestamptz(6)
+  processedAt            DateTime?                       @db.Timestamptz(6)
+  metadata               Json?
+
+  need       Need?              @relation(fields: [needId], references: [id], onDelete: SetNull)
+  reportedBy User?              @relation("NeedReportedBy", fields: [reportedByUserId], references: [id], onDelete: SetNull)
+  media      NeedMedia[]
+  extraction DocumentExtraction?
+
+  @@index([needId], map: "need_reports_need_id_idx")
+  @@index([reportedByUserId], map: "need_reports_reported_by_user_id_idx")
+  @@index([source, submittedAt], map: "need_reports_source_submitted_at_idx")
+  @@index([needsReview, reviewStatus], map: "need_reports_review_queue_idx")
+  @@index([location], type: Gist, map: "need_reports_location_gist_idx")
+  @@map("need_reports")
+}
+
+model NeedMedia {
+  id           String    @id @default(uuid()) @db.Uuid
+  needId       String?   @db.Uuid
+  needReportId String?   @db.Uuid
+  mediaType    MediaType
+  s3Url        String
+  mimeType     String?
+  sizeBytes    Int?
+  durationSecs Int?
+  checksum     String?
+  isPrimary    Boolean   @default(false)
+  uploadedAt   DateTime  @default(now()) @db.Timestamptz(6)
+  metadata     Json?
+
+  need       Need?       @relation(fields: [needId], references: [id], onDelete: Cascade)
+  needReport NeedReport? @relation(fields: [needReportId], references: [id], onDelete: Cascade)
+
+  @@index([needId], map: "need_media_need_id_idx")
+  @@index([needReportId], map: "need_media_need_report_id_idx")
+  @@index([mediaType], map: "need_media_media_type_idx")
+  @@map("need_media")
+}
+
+model DocumentExtraction {
+  id              String       @id @default(uuid()) @db.Uuid
+  needReportId    String       @unique @db.Uuid
+  reviewedByUserId String?     @db.Uuid
+  engine          String
+  sourceLanguage  String?
+  confidenceScore Decimal      @db.Decimal(5, 2)
+  extractedPayload Json
+  parsedEntities  Json?
+  needsReview     Boolean      @default(false)
+  reviewStatus    ReviewStatus @default(PENDING)
+  reviewNotes     String?
+  reviewedAt      DateTime?    @db.Timestamptz(6)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(6)
+
+  needReport NeedReport @relation(fields: [needReportId], references: [id], onDelete: Cascade)
+  reviewedBy User?      @relation("ExtractionReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([reviewStatus, confidenceScore], map: "document_extractions_review_confidence_idx")
+  @@index([needsReview], map: "document_extractions_needs_review_idx")
+  @@map("document_extractions")
+}
+
+model NeedInsight {
+  id            String   @id @default(uuid()) @db.Uuid
+  needId        String   @unique @db.Uuid
+  modelName     String?
+  reasonSummary String
+  evidence      Json
+  generatedAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  need Need @relation(fields: [needId], references: [id], onDelete: Cascade)
+
+  @@map("need_insights")
+}
+
+model NeedAssignment {
+  id                  String           @id @default(uuid()) @db.Uuid
+  needId              String           @db.Uuid
+  assigneeVolunteerId String           @db.Uuid
+  buddyVolunteerId    String?          @db.Uuid
+  assignedByUserId    String?          @db.Uuid
+  status              AssignmentStatus @default(PENDING)
+  rationaleSummary    String?
+  matchingContext     Json?
+  assignedAt          DateTime         @default(now()) @db.Timestamptz(6)
+  acceptedAt          DateTime?        @db.Timestamptz(6)
+  startedAt           DateTime?        @db.Timestamptz(6)
+  completedAt         DateTime?        @db.Timestamptz(6)
+  canceledAt          DateTime?        @db.Timestamptz(6)
+
+  need       Need              @relation(fields: [needId], references: [id], onDelete: Cascade)
+  assignee   VolunteerProfile  @relation("AssignmentAssignee", fields: [assigneeVolunteerId], references: [id], onDelete: Cascade)
+  buddy      VolunteerProfile? @relation("AssignmentBuddy", fields: [buddyVolunteerId], references: [id], onDelete: SetNull)
+  assignedBy User?             @relation("AssignmentCreatedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([needId, status], map: "need_assignments_need_status_idx")
+  @@index([assigneeVolunteerId, status], map: "need_assignments_assignee_status_idx")
+  @@index([buddyVolunteerId], map: "need_assignments_buddy_volunteer_id_idx")
+  @@map("need_assignments")
+}
+
+model Donation {
+  id                   String         @id @default(uuid()) @db.Uuid
+  needId               String         @db.Uuid
+  donorUserId          String         @db.Uuid
+  organizationId       String?        @db.Uuid
+  donationType         DonationType   @default(MONETARY)
+  status               DonationStatus @default(PENDING)
+  stripePaymentIntentId String?       @unique
+  stripeChargeId       String?
+  amount               Decimal        @db.Decimal(12, 2)
+  currency             String         @default("USD") @db.VarChar(3)
+  feeAmount            Decimal?       @db.Decimal(12, 2)
+  impactData           Json?
+  notes                String?
+  paidAt               DateTime?      @db.Timestamptz(6)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(6)
+
+  need          Need          @relation(fields: [needId], references: [id], onDelete: Restrict)
+  donor         User          @relation("DonationDonor", fields: [donorUserId], references: [id], onDelete: Restrict)
+  organization  Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  impactReceipt ImpactReceipt?
+
+  @@index([needId, status], map: "donations_need_id_status_idx")
+  @@index([donorUserId, createdAt], map: "donations_donor_user_id_created_at_idx")
+  @@index([organizationId], map: "donations_organization_id_idx")
+  @@map("donations")
+}
+
+model ImpactReceipt {
+  id                String        @id @default(uuid()) @db.Uuid
+  donationId        String        @unique @db.Uuid
+  receiptNumber     String        @unique
+  status            ReceiptStatus @default(PENDING)
+  generatedPayload  Json
+  resourceDeployment Json?
+  outcomeVerification Json?
+  pdfUrl            String?
+  generatedAt       DateTime?     @db.Timestamptz(6)
+  createdAt         DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @db.Timestamptz(6)
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@map("impact_receipts")
+}
