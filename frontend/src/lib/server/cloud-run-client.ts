@@ -29,6 +29,10 @@ export function shouldAttachIdToken(target: string, mode = serverEnv().CLOUD_RUN
   return url.protocol === "https:" && (url.hostname.endsWith(".run.app") || url.hostname.endsWith(".a.run.app"));
 }
 
+export function copyGoogleAuthHeaders(destination: Headers, source: Headers): void {
+  source.forEach((value, key) => destination.set(key, value));
+}
+
 function messageFromFastApi(payload: unknown, fallback: string): { code: string; message: string; retryable?: boolean; details?: unknown[]; traceId?: string } {
   if (!payload || typeof payload !== "object") return { code: "UPSTREAM_REQUEST_FAILED", message: fallback };
   const record = payload as Record<string, unknown>;
@@ -61,7 +65,7 @@ export async function cloudRunRequest<T>({ service, path, method = "GET", body, 
   if (shouldAttachIdToken(base)) {
     const client = await googleAuth.getIdTokenClient(base);
     const authHeaders = await client.getRequestHeaders(target);
-    Object.entries(authHeaders).forEach(([key, value]) => { if (value) requestHeaders.set(key, value); });
+    copyGoogleAuthHeaders(requestHeaders, authHeaders);
   }
   const controller = new AbortController();
   const abort = () => controller.abort(signal?.reason);
