@@ -1,7 +1,10 @@
 import type { z } from "zod";
 import type {
   citizenReceiptSchema, citizenStatusSchema, evidenceBundleSchema, hotspotDetailSchema,
-  hotspotDtoSchema, mediaReceiptSchema, metricSchema, projectSchema, recommendationSchema,
+  hotspotDtoSchema, mediaReceiptSchema, metricSchema, projectSchema, publicHotspotPageSchema,
+  publicHotspotSchema, recommendationSchema, policyDecisionSchema,
+  normalizationReviewSchema,
+  scoreResponseSchema,
 } from "./schemas";
 
 export type CitizenReceipt = z.infer<typeof citizenReceiptSchema>;
@@ -10,9 +13,14 @@ export type MediaReceipt = z.infer<typeof mediaReceiptSchema>;
 export type HotspotDto = z.infer<typeof hotspotDtoSchema>;
 export type HotspotDetailDto = z.infer<typeof hotspotDetailSchema>;
 export type EvidenceBundleDto = z.infer<typeof evidenceBundleSchema>;
+export type ScoreResponseDto = z.infer<typeof scoreResponseSchema>;
 export type Recommendation = z.infer<typeof recommendationSchema>;
 export type DevelopmentProject = z.infer<typeof projectSchema>;
 export type ImpactMetric = z.infer<typeof metricSchema>;
+export type PublicHotspot = z.infer<typeof publicHotspotSchema>;
+export type PublicHotspotPage = z.infer<typeof publicHotspotPageSchema>;
+export type PolicyDecision = z.infer<typeof policyDecisionSchema>;
+export type NormalizationReview = z.infer<typeof normalizationReviewSchema>;
 
 export type ApproximateLocation = {
   precision: "approximate";
@@ -25,7 +33,8 @@ export type CreateCitizenRequest = {
   channel: "web_text" | "web_voice";
   country_code: "IN" | "BR" | "ZA";
   language_hint: string;
-  location: ApproximateLocation;
+  location?: ApproximateLocation;
+  administrative_area?: string;
   consent: { accepted: true; version: "2026-08-01" };
   text?: string;
 };
@@ -61,6 +70,10 @@ export type HotspotViewModel = {
   calculatedAt: string;
   evidenceBundleId?: string;
   warnings: string[];
+  geography?: HotspotDto["geography"];
+  provenance?: HotspotDto["provenance"];
+  priority?: HotspotDto["priority"];
+  evidenceReadiness?: HotspotDto["evidence_readiness"];
 };
 
 export type HotspotPage = {

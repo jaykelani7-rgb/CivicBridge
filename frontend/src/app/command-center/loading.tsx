@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CommandCenterLoading() {
   return (
-    <main className="dark min-h-screen bg-[#071019] px-4 py-5 text-[#f2ede5] sm:px-6 lg:px-8">
+    <main className="command-center-light min-h-screen bg-[#f5f5f5] px-4 py-5 text-[#092634] sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
         <Card className="border-white/10 bg-[#0d151e] hover:translate-y-0 hover:shadow-none">
           <CardHeader className="space-y-4">

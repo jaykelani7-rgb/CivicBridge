@@ -5,32 +5,26 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
-  HandHeart,
   HeartHandshake,
-  Menu,
   Search,
   ShieldCheck,
   Sparkles,
-  X,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { analyticsAttributes, trackEvent } from "@/lib/analytics";
-import { informationArchitecture } from "@/lib/design-system";
+import { SiteHeader } from "@/components/navigation/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionShell } from "@/components/ui/section-shell";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   howItWorks,
   onboardingPanels,
 } from "./home-data";
 import { HotspotBrowser } from "./opportunity-browser";
+import { SystemPulse } from "./system-pulse";
 
 export function CivicBridgeHome() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   function handleTrackedClick(event: string, label: string, destination: string) {
     trackEvent({
       event,
@@ -40,125 +34,12 @@ export function CivicBridgeHome() {
     });
   }
 
-  return (
+  return (<><SiteHeader />
     <main id="main-content" className="min-h-screen">
-      <a
-        href="#main-content"
-        className="skip-link sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[70] focus:rounded-full focus:bg-card focus:px-4 focus:py-3 focus:text-foreground"
-      >
-        Skip to main content
-      </a>
-
-      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-3 rounded-full px-1 py-1 text-foreground"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-              <HandHeart className="h-5 w-5" />
-            </span>
-            <span>
-              <span className="block font-heading text-xl font-black">CivicBridge AI</span>
-              <span className="block text-sm text-muted-foreground">
-                Digital Public Infrastructure & Governance
-              </span>
-            </span>
-          </Link>
-
-          <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
-            {informationArchitecture.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="hidden items-center gap-3 lg:flex">
-            <ThemeToggle />
-            <Button
-              asChild
-              variant="outline"
-              onClick={() =>
-                handleTrackedClick("analyst_login_clicked", "Analyst login", "/command-center")
-              }
-              {...analyticsAttributes({
-                event: "analyst_login_clicked",
-                category: "navigation",
-                label: "Analyst login",
-                destination: "/command-center",
-              })}
-            >
-              <Link href="/command-center">Analyst Login</Link>
-            </Button>
-            <Button
-              asChild
-              onClick={() =>
-                handleTrackedClick("intake_portal_clicked", "Intake portal", "/volunteer")
-              }
-              {...analyticsAttributes({
-                event: "intake_portal_clicked",
-                category: "navigation",
-                label: "Intake portal",
-                destination: "/volunteer",
-              })}
-            >
-              <Link href="/volunteer">Citizen Intake Portal</Link>
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-2 lg:hidden">
-            <ThemeToggle />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-              onClick={() => setMobileMenuOpen((open) => !open)}
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-          </div>
-        </div>
-
-        {mobileMenuOpen ? (
-          <div className="border-t border-border/70 bg-card/95 px-4 py-4 lg:hidden">
-            <nav aria-label="Mobile primary" className="flex flex-col gap-2">
-              {informationArchitecture.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-2xl px-4 py-3 text-base text-foreground hover:bg-muted"
-                >
-                  {item.label}
-                </a>
-              ))}
-              <Link
-                href="/volunteer"
-                className="rounded-2xl bg-primary px-4 py-3 text-base font-semibold text-primary-foreground"
-              >
-                Intake Portal
-              </Link>
-              <Link
-                href="/command-center"
-                className="rounded-2xl border border-border px-4 py-3 text-base font-semibold text-foreground"
-              >
-                Analyst Login
-              </Link>
-            </nav>
-          </div>
-        ) : null}
-      </header>
-
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
         <section
           id="home"
-          className="relative overflow-hidden rounded-[32px] border border-border bg-[radial-gradient(circle_at_top_left,rgba(230,161,87,0.18),transparent_24%),radial-gradient(circle_at_80%_18%,rgba(107,142,35,0.15),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,247,241,0.98))] px-6 py-8 shadow-soft sm:px-8 sm:py-10 lg:px-10 lg:py-12"
+          className="relative overflow-hidden rounded-[24px] border border-border bg-[radial-gradient(circle_at_top_left,rgba(230,161,87,0.18),transparent_24%),radial-gradient(circle_at_80%_18%,rgba(107,142,35,0.15),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,247,241,0.98))] px-4 py-7 shadow-soft sm:rounded-[32px] sm:px-8 sm:py-10 lg:px-10 lg:py-12"
         >
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div className="space-y-6">
@@ -169,7 +50,7 @@ export function CivicBridgeHome() {
               </div>
 
               <div className="space-y-4">
-                <h1 className="max-w-4xl text-balance font-heading text-5xl font-black tracking-tight text-foreground sm:text-6xl">
+                <h1 className="max-w-4xl break-words text-balance font-heading text-[clamp(2.45rem,12vw,4rem)] font-black leading-[0.98] tracking-tight text-foreground">
                   From Multilingual Citizen Voices to Ranked Infrastructure Projects.
                 </h1>
                 <p className="max-w-2xl text-lg text-muted-foreground sm:text-xl">
@@ -188,20 +69,20 @@ export function CivicBridgeHome() {
                     handleTrackedClick(
                       "hero_browse_clicked",
                       "View Active Hotspots",
-                      "#browse",
+                      "/hotspots",
                     )
                   }
                   {...analyticsAttributes({
                     event: "hero_browse_clicked",
                     category: "hero",
                     label: "View Active Hotspots",
-                    destination: "#browse",
+                    destination: "/hotspots",
                   })}
                 >
-                  <a href="#browse">
+                  <Link href="/hotspots">
                     View Active Hotspots
                     <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
+                  </Link>
                 </Button>
                 <Button
                   asChild
@@ -222,9 +103,7 @@ export function CivicBridgeHome() {
                 </Button>
               </div>
 
-              <div className="rounded-[20px] border border-border/80 bg-card/90 p-4 text-sm text-muted-foreground shadow-sm">
-                Aggregate platform statistics will appear when a canonical summary endpoint is available. No demonstration totals are shown in production.
-              </div>
+              <SystemPulse />
             </div>
 
             <motion.div
@@ -275,8 +154,8 @@ export function CivicBridgeHome() {
                   </Card>
                 </div>
                 <Card className="overflow-hidden border-primary/15 bg-[linear-gradient(135deg,rgba(209,96,61,0.08),rgba(63,81,181,0.08))]">
-                  <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-1">
+                  <CardContent className="grid min-w-0 gap-4 p-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                    <div className="min-w-0 space-y-1">
                       <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
                         Live operations
                       </p>
@@ -284,7 +163,7 @@ export function CivicBridgeHome() {
                         Intake queues, spatial enrichment, and policymaker decisions stay connected.
                       </p>
                     </div>
-                    <Button asChild variant="accent">
+                    <Button asChild variant="accent" className="w-full whitespace-normal text-center sm:w-fit xl:whitespace-nowrap">
                       <Link href="/command-center">View analyst console</Link>
                     </Button>
                   </CardContent>
@@ -410,6 +289,6 @@ export function CivicBridgeHome() {
           </div>
         </div>
       </footer>
-    </main>
+    </main></>
   );
 }

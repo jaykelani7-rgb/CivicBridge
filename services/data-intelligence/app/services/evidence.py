@@ -20,7 +20,7 @@ def anonymize_summary(value: str) -> str:
 def build_evidence_bundle(
     *, hotspot: dict[str, Any], geography: dict[str, Any], members: list[dict[str, Any]],
     components: list[dict[str, Any]], enrichment: dict[str, Any], bundle_version: int,
-    created_at: str, warnings: list[str],
+    created_at: str, warnings: list[str], metadata: dict[str, Any] | None = None,
 ) -> tuple[str, str, dict[str, Any]]:
     # Deliberately omit exact coordinates, raw statements, media, and contact data.
     body = {
@@ -54,6 +54,7 @@ def build_evidence_bundle(
         ],
         "bundle_version": bundle_version,
         "created_at": created_at,
+        **(metadata or {}),
     }
     for section in ("demographic_features", "infrastructure_gap_records", "investment_plan_records"):
         for record in body[section]:

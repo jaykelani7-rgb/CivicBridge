@@ -115,12 +115,17 @@ class SQLiteRepository:
 
     def upsert_source(self, row: dict[str, Any]) -> None:
         self.connection.execute(
-            "INSERT INTO data_sources VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET "
+            "INSERT INTO data_sources(source_id,publisher,dataset_title,country_code,geographic_coverage,time_coverage,retrieved_at,license,"
+            "transformation_notes,confidence,freshness_status,synthetic,classification,dataset_version,public_url,upstream_source_ids_json) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET "
             "publisher=excluded.publisher,dataset_title=excluded.dataset_title,retrieved_at=excluded.retrieved_at,"
-            "confidence=excluded.confidence,freshness_status=excluded.freshness_status",
+            "confidence=excluded.confidence,freshness_status=excluded.freshness_status,synthetic=excluded.synthetic,"
+            "classification=excluded.classification,dataset_version=excluded.dataset_version,public_url=excluded.public_url,"
+            "upstream_source_ids_json=excluded.upstream_source_ids_json",
             (row["source_id"], row["publisher"], row["dataset_title"], row["country_code"], row["geographic_coverage"],
              row["time_coverage"], row["retrieved_at"], row.get("license"), row["transformation_notes"], row["confidence"],
-             row["freshness_status"], int(row.get("synthetic", False))),
+             row["freshness_status"], int(row.get("synthetic", False)), row.get("classification", "unclassified"),
+             row.get("dataset_version"), row.get("public_url"), json.dumps(row.get("upstream_source_ids", []))),
         )
 
     def upsert_demographic(self, row: dict[str, Any]) -> None:
@@ -159,10 +164,12 @@ class SQLiteRepository:
         projects = [dict(x) for x in self.connection.execute(
             "SELECT * FROM investment_projects WHERE geography_id=? AND category=? ORDER BY project_id", (geography_id, category)
         ).fetchall()]
-        source_ids = sorted({x["source_id"] for x in [demographic, infrastructure, *projects] if x})
+        source_ids = sorted({x["source_id"] for x in [demographic, infrastructure, *projects] if x and x.get("source_id")})
         sources = [dict(x) for x in self.connection.execute(
             f"SELECT * FROM data_sources WHERE source_id IN ({','.join('?' for _ in source_ids)}) ORDER BY source_id", source_ids
         ).fetchall()] if source_ids else []
+        for source in sources:
+            source["upstream_source_ids"] = json.loads(source.pop("upstream_source_ids_json", "[]"))
         return {"demographic": demographic, "infrastructure": infrastructure, "projects": projects, "sources": sources}
 
     def create_seed_cluster(self, seed: dict[str, Any], spatial_cell: str) -> None:
@@ -172,9 +179,11 @@ class SQLiteRepository:
              seed["summary"], seed["occurred_at"], seed["occurred_at"], 1, 0, "active", "fixture_seed", 1, seed["latitude"], seed["longitude"]),
         )
         self.connection.execute(
-            "INSERT OR IGNORE INTO cluster_members VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO cluster_members(request_id,cluster_id,event_id,summary,requested_outcome,urgency,request_confidence,"
+            "location_confidence,occurred_at,active,evidence_refs_json,group_relationship) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (seed["request_id"], seed["cluster_id"], "fixture:" + seed["request_id"], seed["summary"], seed["requested_outcome"],
-             seed["urgency"], seed["confidence"], 1.0, seed["occurred_at"], 1, json.dumps(["fixture:" + seed["request_id"]])),
+             seed["urgency"], seed["confidence"], 1.0, seed["occurred_at"], 1, json.dumps(["fixture:" + seed["request_id"]]),
+             seed.get("group_relationship", "distinct_theme")),
         )
 
     def list_candidate_members(self, country_code: str, category: str, occurred_after: str) -> list[dict[str, Any]]:
@@ -197,12 +206,27 @@ class SQLiteRepository:
              row["centroid_lat"], row["centroid_lon"]),
         )
 
+    def save_normalized_request(self, row: dict[str, Any]) -> None:
+        self.connection.execute(
+            "INSERT INTO normalized_requests(request_id,event_id,country_code,category,subcategory,summary,requested_outcome,urgency,confidence,"
+            "model,prompt_version,schema_version,occurred_at,created_at,original_language,working_language,anonymized_original_summary,"
+            "translation_performed,translation_provider,evidence_types_json,pii_flags_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(request_id) DO NOTHING",
+            (row["request_id"], row["event_id"], row["country_code"], row["category"], row.get("subcategory"),
+             row["summary"], row["requested_outcome"], row["urgency"], row["confidence"], row["model"],
+             row["prompt_version"], row["schema_version"], row["occurred_at"], row["created_at"], row.get("original_language"),
+             row.get("working_language", "en"), row.get("anonymized_original_summary"), int(row.get("translation_performed", False)),
+             row.get("translation_provider"), json.dumps(row.get("evidence_types", [])), json.dumps(row.get("pii_flags", []))),
+        )
+
     def add_cluster_member(self, row: dict[str, Any]) -> bool:
         before = self.connection.total_changes
         self.connection.execute(
-            "INSERT OR IGNORE INTO cluster_members VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO cluster_members(request_id,cluster_id,event_id,summary,requested_outcome,urgency,request_confidence,"
+            "location_confidence,occurred_at,active,evidence_refs_json,group_relationship) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (row["request_id"], row["cluster_id"], row["event_id"], row["summary"], row["requested_outcome"], row["urgency"],
-             row["request_confidence"], row["location_confidence"], row["occurred_at"], 1, json.dumps(row["evidence_refs"])),
+             row["request_confidence"], row["location_confidence"], row["occurred_at"], 1, json.dumps(row["evidence_refs"]),
+             row.get("group_relationship", "distinct_theme")),
         )
         inserted = self.connection.total_changes > before
         if inserted:
@@ -248,9 +272,20 @@ class SQLiteRepository:
         )
 
     def get_cluster_members(self, cluster_id: str) -> list[dict[str, Any]]:
-        return [dict(x) for x in self.connection.execute(
-            "SELECT * FROM cluster_members WHERE cluster_id=? AND active=1 ORDER BY occurred_at", (cluster_id,)
-        ).fetchall()]
+        rows = self.connection.execute(
+            "SELECT m.*,n.original_language,n.working_language,n.anonymized_original_summary,n.translation_performed,"
+            "n.translation_provider,n.evidence_types_json,n.pii_flags_json FROM cluster_members m "
+            "LEFT JOIN normalized_requests n ON n.request_id=m.request_id WHERE m.cluster_id=? AND m.active=1 ORDER BY m.occurred_at,m.request_id",
+            (cluster_id,),
+        ).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            item["translation_performed"] = bool(item.get("translation_performed"))
+            item["evidence_types"] = json.loads(item.pop("evidence_types_json") or "[]")
+            item["pii_flags"] = json.loads(item.pop("pii_flags_json") or "[]")
+            result.append(item)
+        return result
 
     def get_or_create_hotspot_id(self, cluster_id: str, proposed_id: str) -> str:
         row = self.connection.execute("SELECT hotspot_id FROM hotspots_daily WHERE cluster_id=?", (cluster_id,)).fetchone()
@@ -350,6 +385,10 @@ class SQLiteRepository:
             "SELECT * FROM score_components WHERE hotspot_id=? AND hotspot_version=? ORDER BY component_name", (hotspot_id,version)
         ).fetchall():
             item = dict(row)
+            # Public/API names follow the component contract while the legacy
+            # database column names remain readable for older repository code.
+            item["name"] = item["component_name"]
+            item["confidence"] = item["component_confidence"]
             item["source_ids"] = json.loads(item.pop("source_ids_json"))
             item["missing"] = bool(item["missing"])
             components.append(item)
@@ -360,6 +399,32 @@ class SQLiteRepository:
             "SELECT bundle_json FROM evidence_bundles WHERE hotspot_id=? ORDER BY bundle_version DESC LIMIT 1", (hotspot_id,)
         ).fetchone()
         return json.loads(row[0]) if row else None
+
+    def get_score_history(self, hotspot_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        rows = self.connection.execute(
+            "SELECT version,snapshot_json,reason,created_at FROM hotspot_versions "
+            "WHERE hotspot_id=? ORDER BY version DESC LIMIT ?", (hotspot_id, limit)
+        ).fetchall()
+        history = []
+        for row in rows:
+            snapshot = json.loads(row["snapshot_json"])
+            history.append({
+                "version": row["version"], "need_score": snapshot.get("need_score"),
+                "action_score": snapshot.get("action_score"),
+                "evidence_confidence": snapshot.get("evidence_confidence"),
+                "score_version": snapshot.get("score_version"), "reason": row["reason"],
+                "calculated_at": snapshot.get("calculated_at") or row["created_at"],
+            })
+        return history
+
+    def workflow_counts(self) -> dict[str, int]:
+        def scalar(sql: str) -> int:
+            return int(self.connection.execute(sql).fetchone()[0])
+        return {
+            "normalized": scalar("SELECT COUNT(*) FROM processed_events WHERE status='completed'"),
+            "clustered": scalar("SELECT COUNT(*) FROM cluster_members WHERE active=1"),
+            "active_priorities": scalar("SELECT COUNT(*) FROM hotspots_daily WHERE status='active'"),
+        }
 
     def list_hotspots(self, filters: dict[str, Any], page: int, page_size: int) -> tuple[list[dict[str, Any]], int]:
         clauses, values = [], []
@@ -384,6 +449,23 @@ class SQLiteRepository:
             item["warnings"] = json.loads(item.pop("warnings_json"))
             result.append(item)
         return result,total
+
+    def list_hotspots_for_ranking(self, country_code: str, category: Optional[str] = None) -> list[dict[str, Any]]:
+        clauses, values = ["country_code=?", "status='active'"], [country_code]
+        if category:
+            clauses.append("category=?")
+            values.append(category)
+        rows = self.connection.execute(
+            "SELECT * FROM hotspots_daily WHERE " + " AND ".join(clauses) +
+            " ORDER BY action_score DESC,evidence_confidence DESC,request_count DESC,calculated_at DESC,hotspot_id",
+            values,
+        ).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            item["warnings"] = json.loads(item.pop("warnings_json"))
+            result.append(item)
+        return result
 
     def dataset_counts(self) -> dict[str, int]:
         tables = ["admin_units","data_sources","demographic_features","infrastructure_indices","investment_projects"]

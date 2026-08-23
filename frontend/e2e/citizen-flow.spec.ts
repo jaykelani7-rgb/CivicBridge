@@ -10,8 +10,11 @@ test("citizen submits, sees processing summary, and confirms", async ({ page }) 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).toBeVisible();
+  await page.getByLabel("Written report alternative").fill("The stormwater drain near the school is blocked.");
+  await page.getByRole("button", { name: /Continue to location/i }).click();
+  await expect(page.getByText("No browser location added")).toBeVisible();
   await page.getByLabel("Administrative area or landmark").fill("Ward 42, Jaipur");
-  await page.getByLabel("Written report").fill("The stormwater drain near the school is blocked.");
+  await page.getByRole("button", { name: /Review report/i }).click();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Submit request" }).click();
   await expect(page.getByText("Stormwater drainage is blocked near the school.")).toBeVisible();

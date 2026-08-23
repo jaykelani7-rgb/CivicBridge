@@ -1,0 +1,16 @@
+{
+  "version": "decision-metadata-1.0.0",
+  "ranking_methodology_version": "priority-ranking-1.0.0",
+  "readiness_ruleset_version": "evidence-readiness-1.0.0",
+  "priority_bands": [
+    {"band": "critical", "minimum_action_score": 85.0, "reason_code": "ACTION_SCORE_CRITICAL"},
+    {"band": "high", "minimum_action_score": 70.0, "reason_code": "ACTION_SCORE_HIGH"},
+    {"band": "medium", "minimum_action_score": 50.0, "reason_code": "ACTION_SCORE_MEDIUM"},
+    {"band": "low", "minimum_action_score": 0.0, "reason_code": "ACTION_SCORE_LOW"}
+  ],
+  "minimum_evidence_confidence": 0.4,
+  "essential_components": ["demand_rate", "infrastructure_gap", "severity"],
+  "caution_fallback_count": 1,
+  "stale_source_days": 730,
+  "public_priority_enabled": true
+}

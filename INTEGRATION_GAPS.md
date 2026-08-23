@@ -26,6 +26,18 @@ The current Policy + Impact contract does not provide a complete audit-report/re
 
 As documented in the root README, several canonical services still use process memory, SQLite, local files, or mock/stub dependencies. The BFF does not hide those limitations. Production durability and replacement of Policy service stubs remain backend-owner work.
 
+Data Intelligence now persists optional evidence language, grouping, source classification,
+structured limitation, readiness, and priority metadata in its operational store/evidence
+bundle. The default Cloud Run SQLite file is still ephemeral, so this metadata can disappear
+when an instance is replaced. The repository includes an additive PostgreSQL migration, but
+this change does not provision Cloud SQL or modify a deployment.
+
+AI Normalization does not currently generate an original-language summary. It safely supplies
+the normalized working-language summary and leaves `anonymized_original_summary` absent rather
+than exposing or relabelling its masked full transcript. Producing that optional field later
+requires a versioned, evaluated AI Normalization extraction change; Data Intelligence already
+accepts and propagates it when present.
+
 ## Legacy frontend services
 
 `frontend/services/core-api`, `frontend/services/ai-microservice`, and `frontend/compose.yaml` describe the older ResourceMatch architecture. They are intentionally not deleted, imported, started, or integrated. Removal requires teammate confirmation.

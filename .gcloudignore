@@ -1,0 +1,31 @@
+.gcloudignore
+.git/
+.gitignore
+
+# Local dependency and build output directories are never Cloud Build inputs.
+**/node_modules/
+**/.next/
+**/test-results/
+**/playwright-report/
+**/.pytest_cache/
+**/.ruff_cache/
+**/__pycache__/
+**/*.pyc
+
+# Local environments, databases, logs, and credentials.
+.venv/
+venv/
+ENV/
+env/
+*.db
+*.sqlite3
+*.log
+.env
+.env.*
+!.env.example
+!**/.env.example
+service-account*.json
+credentials.json
+.DS_Store
+.vscode/
+.idea/

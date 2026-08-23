@@ -24,12 +24,23 @@ def test_process_list_detail_score_and_evidence(client):
     listing = client.get("/v1/hotspots",params={"country_code":"IN","category":"drainage","min_need_score":0,"page_size":1})
     assert listing.status_code == 200
     assert listing.json()["pagination"]["total"] == 1
+    public_item = listing.json()["items"][0]
+    assert public_item["geography"]["public_centroid"] == {
+        "latitude":26.91,"longitude":75.79,"precision":"administrative_area"
+    }
+    assert public_item["geography"]["boundary_geojson"] is None
+    assert public_item["geography"]["limitation"]
+    assert public_item["provenance"]["is_synthetic"] is True
+    assert "centroid_lat" not in public_item and "centroid_lon" not in public_item
     assert client.get(f"/v1/hotspots/{hotspot_id}").json()["hotspot"]["hotspot_id"] == hotspot_id
     score = client.get(f"/v1/hotspots/{hotspot_id}/score").json()
     assert score["components"] and all("weighted_contribution" in x for x in score["components"])
     evidence = client.get(f"/v1/hotspots/{hotspot_id}/evidence").json()
     assert evidence["bundle_hash"].startswith("sha256:")
     assert evidence["evidence_bundle_id"] == result["evidence_bundle_id"]
+    summary = client.get("/v1/summary").json()
+    assert summary["normalized"] == 1 and summary["active_priorities"] == 1
+    assert summary["provenance"] == "synthetic"
 
 
 def test_duplicate_delivery_is_idempotent(client,app):
@@ -118,3 +129,36 @@ def test_pipeline_continues_and_identifies_lexical_fallback(client, app):
     assert result["similarity_processing"]["provider"] == "lexical"
     assert result["similarity_processing"]["degraded"] is True
     assert result["duplicate_candidates"][0]["degraded_similarity"] is True
+
+
+def test_metadata_flows_from_normalized_event_to_ranked_evidence(client):
+    payload = event_payload("BR")
+    payload["data"].update({
+        "working_language": "en",
+        "anonymized_original_summary": "Resumo anonimizado sobre coleta irregular.",
+        "translation": {"performed": True, "provider": "google-cloud-translation", "confidence": None},
+        "evidence_types": ["text", "photo"],
+    })
+    processed = _process(client, payload=payload)
+    assert processed.status_code == 200
+    hotspot_id = processed.json()["hotspot_id"]
+    detail = client.get(f"/v1/hotspots/{hotspot_id}").json()["hotspot"]
+    assert detail["priority"]["rank"] >= 1
+    assert detail["priority"]["ranking_scope"] == {"country_code": "BR", "category": None}
+    evidence = client.get(f"/v1/hotspots/{hotspot_id}/evidence").json()
+    assert evidence["metadata_schema_version"] == "decision-metadata-1.0.0"
+    assert evidence["evidence_groups"][0]["representative_original_summary"].startswith("Resumo anonimizado")
+    assert evidence["evidence_groups"][0]["evidence_types"] == ["image", "text"]
+    assert evidence["evidence_readiness"]["state"] == "review_with_caution"
+    assert all(source["classification"] in {"synthetic_demo", "citizen_aggregate"} for source in evidence["sources"])
+    serialized = str(evidence)
+    assert payload["data"].get("transcript_original", "never-present") not in serialized
+
+
+def test_list_pagination_does_not_change_canonical_rank(client):
+    first = _process(client, payload=event_payload("IN")).json()["hotspot_id"]
+    page_one = client.get("/v1/hotspots", params={"country_code": "IN", "page": 1, "page_size": 1}).json()
+    detail = client.get(f"/v1/hotspots/{first}").json()["hotspot"]
+    if page_one["items"][0]["hotspot_id"] == first:
+        assert page_one["items"][0]["priority"]["rank"] == detail["priority"]["rank"]
+    assert detail["priority"]["total_ranked"] >= page_one["pagination"]["total"]

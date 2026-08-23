@@ -16,6 +16,7 @@ describe("GET /api/auth/config", () => {
   it("returns only the allowlisted public Firebase values", async () => {
     setValidPublicEnvironment();
     vi.stubEnv("CITIZEN_CHANNELS_URL", "https://citizen-private.run.app");
+    vi.stubEnv("AI_NORMALIZATION_URL", "https://normalization-private.run.app");
     vi.stubEnv("DATA_INTELLIGENCE_URL", "https://intelligence-private.run.app");
     vi.stubEnv("GOOGLE_APPLICATION_CREDENTIALS", "/private/service-account.json");
     vi.stubEnv("UNRELATED_PRIVATE_SECRET", "must-not-leak");

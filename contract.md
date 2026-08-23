@@ -840,3 +840,42 @@ By working against this contract, each teammate agrees to:
 - AI Normalization: **Shreyank**
 - Data Intelligence: **Jay**
 - Policy + Impact: **Sharmad**
+
+---
+
+## 21. Evidence and decision-support metadata (additive 1.0)
+
+Data Intelligence is the canonical authority for the optional `priority`, `evidence_groups`,
+`limitations_structured`, `evidence_readiness`, and classified `sources` response fields.
+These fields are additive: existing `request.normalized.v1`, `hotspot.updated.v1`, hotspot,
+score, and evidence fields remain unchanged, and consumers must continue to accept records
+that predate this metadata.
+
+Ranking is within a country by default, or within country and category when the category
+scope is explicitly requested. Active hotspots are ordered by Action Score, evidence
+confidence, request count, calculated timestamp, and finally hotspot ID. Bands are defined
+once in `decision-metadata-1.0.0.json`: critical 85+, high 70+, medium 50+, and low 0+.
+Evidence confidence below 0.40 or a missing essential demand-rate, infrastructure-gap, or
+severity input produces `insufficient_evidence`, irrespective of rank.
+
+Evidence groups use persisted cluster membership and accepted duplicate assignments. A
+`probable_duplicate` group means the submissions met the configured automatic-attachment
+threshold; it does not mean independent verification. Legacy members without grouping
+metadata remain separate `distinct_theme` records. Group IDs are stable hashes of internal
+cluster identity and never expose request IDs.
+
+AI Normalization may add `working_language`, `anonymized_original_summary`, and `translation`
+to `request.normalized.v1`. They are optional. Data Intelligence never substitutes the full
+masked transcript for a reviewed original-language summary and never calls Translation API.
+
+Evidence readiness is deterministic decision-support metadata, not an approval. Blocking
+limitations produce `insufficient_evidence`; warnings such as synthetic sources or fallbacks
+produce `review_with_caution`; otherwise the state is `ready_for_human_review`. Action Score
+is not changed by readiness. Demonstration sources are `synthetic_demo` and are not official
+statistics. Historical unknown source types remain `unclassified`; official status is only
+assigned by the validated official-dataset ingestion path.
+
+Public projections may expose rank, total, band, ranking scope, and ranked timestamp. They
+must omit reason codes, reviewer actions, internal source diagnostics, request IDs, exact
+coordinates, transcripts, media, embeddings, and private URLs. Exact citizen locations and
+identities remain excluded, and a human policymaker remains responsible for approval.

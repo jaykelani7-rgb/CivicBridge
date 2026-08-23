@@ -1,9 +1,10 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
 import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { MobileBottomNavigation } from "@/components/navigation/mobile-bottom-navigation";
+import { PublicLocaleProvider } from "./public-locale-provider";
 
 type AppProvidersProps = {
   children: React.ReactNode;
@@ -27,11 +28,12 @@ export function AppProviders({ children }: AppProvidersProps) {
   );
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <PublicLocaleProvider>
         {children}
+        <MobileBottomNavigation />
         <Toaster />
-      </QueryClientProvider>
-    </ThemeProvider>
+      </PublicLocaleProvider>
+    </QueryClientProvider>
   );
 }

@@ -14,7 +14,7 @@ export default function CommandCenterError({
   reset,
 }: CommandCenterErrorProps) {
   return (
-    <main className="dark flex min-h-screen items-center justify-center bg-[#071019] px-5 py-10 text-[#f2ede5]">
+    <main className="command-center-light flex min-h-screen items-center justify-center bg-[#f5f5f5] px-5 py-10 text-[#092634]">
       <Card className="w-full max-w-xl border-white/10 bg-[#10161e] text-[#f2ede5] hover:translate-y-0 hover:shadow-none">
         <CardHeader className="space-y-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-warning/15 text-warning">

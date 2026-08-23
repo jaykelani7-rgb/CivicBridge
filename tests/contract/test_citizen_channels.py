@@ -24,6 +24,16 @@ def test_health_check():
     assert data["service"] == "citizen-channels"
     assert data["owner"] == "Sujal"
 
+def test_admin_area_submission_does_not_invent_coordinates():
+    response = client.post("/v1/requests", json={
+        "channel":"web_text","country_code":"IN","language_hint":"hi-IN",
+        "administrative_area":"Ward 42, Jaipur","text":"Public drain is blocked.",
+        "consent":{"accepted":True,"version":"2026-08-01"},
+    })
+    assert response.status_code == 202, response.text
+    from services.citizen_channels.storage import citizen_storage
+    assert citizen_storage.requests[response.json()["request_id"]]["location"] is None
+
 def test_create_request_success():
     payload = {
         "channel": "web_text",

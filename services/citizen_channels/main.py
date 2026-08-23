@@ -112,6 +112,21 @@ def get_health():
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
 
+
+@app.get("/v1/summary")
+def get_public_summary():
+    """Return aggregate workflow counts only; never citizen content or location."""
+    stages: Dict[str, int] = {}
+    for record in citizen_storage.requests.values():
+        stage = str(record.get("processing_stage", "submitted"))
+        stages[stage] = stages.get(stage, 0) + 1
+    return {
+        "reports_received": len(citizen_storage.requests),
+        "stages": stages,
+        "provenance": "live",
+        "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
 # 1. POST /v1/requests - Create request metadata
 @app.post("/v1/requests", status_code=status.HTTP_202_ACCEPTED)
 async def create_request(
@@ -137,7 +152,8 @@ async def create_request(
             country_code=record["country_code"],
             language_hint=record["language_hint"],
             content_ref=record["content_ref"],
-            location=LocationApproximate(**record["location"]),
+            location=LocationApproximate(**record["location"]) if record["location"] else None,
+            administrative_area=record.get("administrative_area"),
             consent=record["consent"],
             submitted_at=record["submitted_at"]
         ).model_dump()
@@ -218,7 +234,8 @@ async def confirm_request(
         data=RequestConfirmedData(
             request_id=request_id,
             confirmed_at=updated["confirmed_at"],
-            location_confirmed=LocationApproximate(**updated["location"]),
+            location_confirmed=LocationApproximate(**updated["location"]) if updated.get("location") else None,
+            administrative_area=updated.get("administrative_area"),
             citizen_notes=notes
         ).model_dump()
     )

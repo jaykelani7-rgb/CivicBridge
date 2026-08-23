@@ -214,10 +214,10 @@ class BigQueryOfficialDatasetIngestor:
             DELETE FROM {table} WHERE source_id=@source_id AND snapshot_id=@snapshot_id;
             INSERT INTO {table} (source_id,dataset_id,dataset_version,snapshot_id,publisher,dataset_title,country_code,
               geographic_coverage,time_coverage,retrieved_at,license,source_url,transformation_notes,confidence,
-              freshness_status,synthetic,is_current,ingested_at)
+              freshness_status,synthetic,classification,is_current,ingested_at)
             VALUES (@source_id,@dataset_id,@dataset_version,@snapshot_id,@publisher,@dataset_title,@country_code,
               @geographic_coverage,@time_coverage,@retrieved_at,@license,@source_url,@transformation_notes,@confidence,
-              @freshness_status,FALSE,TRUE,CURRENT_TIMESTAMP());
+              @freshness_status,FALSE,'official_public',TRUE,CURRENT_TIMESTAMP());
             COMMIT TRANSACTION;
         """
 

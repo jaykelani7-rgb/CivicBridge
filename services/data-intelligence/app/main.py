@@ -26,8 +26,9 @@ from app.domain.ports import (
     FallbackEmbeddingRepository,
     FallbackGeographyProvider,
 )
-from app.repositories.sqlite import SQLiteRepository
+from app.repositories.factory import build_operational_repository
 from app.services.duplicates import DuplicateDetector
+from app.services.decision_metadata import DecisionMetadataService, load_decision_metadata_config
 from app.services.outbox import OutboxDispatcher
 from app.services.pipeline import IntelligencePipeline
 from app.services.scoring import ScoringEngine
@@ -43,7 +44,7 @@ def _error(code: str, message: str, retryable: bool, details: list, trace_id: st
 def create_app(settings: Optional[Settings] = None, *, publisher=None) -> FastAPI:
     settings = settings or Settings.from_env()
     configure_logging(settings.log_level,settings.environment)
-    repository = SQLiteRepository(settings.database_path,BASE_DIR / "migrations")
+    repository = build_operational_repository(settings,BASE_DIR / "migrations")
     fixture_dir = settings.resolved_fixture_dir()
     load_fixtures(repository,fixture_dir,settings.country_packs)
     local_geography = LocalGeographyProvider(repository,settings.grid_resolution)
@@ -65,6 +66,8 @@ def create_app(settings: Optional[Settings] = None, *, publisher=None) -> FastAP
                      if settings.allow_local_fallback else primary_geography)
     scoring_path = BASE_DIR / "app" / "config" / "scoring" / f"{settings.score_version}.json"
     scoring = ScoringEngine(scoring_path)
+    metadata_path = BASE_DIR / "app" / "config" / "decision_metadata" / "decision-metadata-1.0.0.json"
+    decision_metadata = DecisionMetadataService(load_decision_metadata_config(metadata_path))
     metrics = Metrics()
     publisher = publisher or (PubSubEventPublisher(settings.pubsub_project or "",settings.pubsub_topic)
                               if settings.event_bus == "pubsub" else InMemoryEventPublisher())
@@ -77,11 +80,12 @@ def create_app(settings: Optional[Settings] = None, *, publisher=None) -> FastAP
     detector = DuplicateDetector(repository,settings.duplicate_distance_km,settings.duplicate_time_window_days,
                                  settings.duplicate_high_threshold,settings.duplicate_review_threshold,
                                  similarity_service)
-    pipeline = IntelligencePipeline(repository,geography,detector,scoring,outbox,metrics,analytical_repository)
+    pipeline = IntelligencePipeline(repository,geography,detector,scoring,outbox,metrics,analytical_repository,decision_metadata)
     app = FastAPI(title="CivicBridge Data Intelligence API",version="1.0.0",
                   description="Deterministic geospatial enrichment, clustering, hotspot scoring, and bounded evidence.")
     app.state.settings,app.state.repository,app.state.publisher = settings,repository,publisher
     app.state.analytical_repository = analytical_repository
+    app.state.decision_metadata = decision_metadata
     app.state.similarity_service = similarity_service
     app.state.primary_analytical_repository = primary_analytical_repository
     app.state.primary_geography_provider = primary_geography

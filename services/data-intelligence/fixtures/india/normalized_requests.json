@@ -2,7 +2,8 @@
   {
     "event_id":"a1000000-0000-4000-8000-000000000001","event_type":"request.normalized.v1","schema_version":"1.0.0",
     "occurred_at":"2026-08-20T10:30:00Z","producer":"ai-normalization","trace_id":"a1100000-0000-4000-8000-000000000001",
-    "data":{"request_id":"a1200000-0000-4000-8000-000000000001","country_code":"IN","original_language":"hi-IN",
+    "data":{"request_id":"a1200000-0000-4000-8000-000000000001","country_code":"IN","original_language":"hi-IN","working_language":"en",
+      "translation":{"performed":true,"provider":"google-cloud-translation","confidence":null},
       "translation_working":"The road floods whenever it rains.","category":"drainage","subcategory":"stormwater_drainage",
       "summary":"Recurring road flooding blocks access during rain in Ward 42.","problem_description":"The road floods during rain.",
       "requested_outcome":"Repair roadside stormwater drainage.","urgency":"high","affected_scope":"community",
@@ -13,7 +14,8 @@
   {
     "event_id":"a1000000-0000-4000-8000-000000000002","event_type":"request.normalized.v1","schema_version":"1.0.0",
     "occurred_at":"2026-08-19T08:00:00Z","producer":"ai-normalization","trace_id":"a1100000-0000-4000-8000-000000000002",
-    "data":{"request_id":"a1200000-0000-4000-8000-000000000002","country_code":"IN","original_language":"en-IN",
+    "data":{"request_id":"a1200000-0000-4000-8000-000000000002","country_code":"IN","original_language":"en-IN","working_language":"en",
+      "translation":{"performed":false,"provider":null,"confidence":null},
       "translation_working":"Potholes are making the Ward 18 road unsafe.","category":"roads","subcategory":"road_surface",
       "summary":"Damaged road surface affects access in Ward 18.","problem_description":"Multiple potholes affect the local road.",
       "requested_outcome":"Repair the damaged road surface.","urgency":"medium","affected_scope":"neighborhood",

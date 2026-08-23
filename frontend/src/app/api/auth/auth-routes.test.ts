@@ -22,7 +22,7 @@ function mutationRequest(path: string, body?: unknown, requestOrigin = origin) {
 describe("Firebase auth routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.assign(process.env, { CITIZEN_CHANNELS_URL: "http://127.0.0.1:8000", DATA_INTELLIGENCE_URL: "http://127.0.0.1:8002", POLICY_IMPACT_URL: "http://127.0.0.1:8003", FIREBASE_PROJECT_ID: "civicbridge-1", AUTH_ORIGIN: origin, FIREBASE_SESSION_MAX_AGE_SECONDS: "432000" });
+    Object.assign(process.env, { CITIZEN_CHANNELS_URL: "http://127.0.0.1:8000", AI_NORMALIZATION_URL: "http://127.0.0.1:8001", DATA_INTELLIGENCE_URL: "http://127.0.0.1:8002", POLICY_IMPACT_URL: "http://127.0.0.1:8003", FIREBASE_PROJECT_ID: "civicbridge-1", AUTH_ORIGIN: origin, FIREBASE_SESSION_MAX_AGE_SECONDS: "432000" });
     resetServerEnvForTests();
   });
 

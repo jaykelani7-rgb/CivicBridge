@@ -6,7 +6,11 @@ COPY app ./app
 COPY migrations ./migrations
 COPY fixtures ./fixtures
 RUN pip install --no-cache-dir '.[production]'
-RUN useradd --create-home --uid 10001 appuser && mkdir -p /service/data && chown -R appuser:appuser /service
+RUN mkdir -p /service/data && \
+    python -m app.adapters.local.demo_database \
+      --database-path /service/data/intelligence.db \
+      --fixture-dir /service/fixtures
+RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /service
 USER appuser
 EXPOSE 8080
 CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8080"]

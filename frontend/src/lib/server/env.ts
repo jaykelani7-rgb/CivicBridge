@@ -4,6 +4,7 @@ import { z } from "zod";
 const serviceUrl = z.string().url().transform((value) => value.replace(/\/$/, ""));
 const schema = z.object({
   CITIZEN_CHANNELS_URL: serviceUrl,
+  AI_NORMALIZATION_URL: serviceUrl,
   DATA_INTELLIGENCE_URL: serviceUrl,
   POLICY_IMPACT_URL: serviceUrl,
   GOOGLE_CLOUD_PROJECT: z.string().optional(),

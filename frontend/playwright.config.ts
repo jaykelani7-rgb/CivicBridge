@@ -11,6 +11,7 @@ export default defineConfig({
     env: {
       ...process.env,
       CITIZEN_CHANNELS_URL: "http://127.0.0.1:8000",
+      AI_NORMALIZATION_URL: "http://127.0.0.1:8001",
       DATA_INTELLIGENCE_URL: "http://127.0.0.1:8002",
       POLICY_IMPACT_URL: "http://127.0.0.1:8003",
       FIREBASE_PROJECT_ID: "e2e-placeholder",
@@ -23,5 +24,10 @@ export default defineConfig({
       NEXT_PUBLIC_FIREBASE_EMAIL_PASSWORD_ENABLED: "false",
     },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "Mobile Chrome", use: { ...devices["Pixel 7"] } },
+    { name: "Mobile Safari", use: { ...devices["iPhone 13"], browserName: "webkit" } },
+    { name: "Tablet", use: { ...devices["iPad (gen 7)"], browserName: "chromium" } },
+    { name: "Desktop Chrome", use: { ...devices["Desktop Chrome"] } },
+  ],
 });

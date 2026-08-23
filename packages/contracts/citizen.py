@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 import datetime
 
 class LocationApproximate(BaseModel):
@@ -22,7 +22,10 @@ class CreateRequestPayload(BaseModel):
     channel: str = Field(..., description="web_text, web_voice, mobile_text, mobile_voice")
     country_code: str = Field(..., description="ISO 3166-1 alpha-2 (e.g. IN, BR, ZA)")
     language_hint: str = Field(..., description="BCP 47 language code (e.g. hi-IN, pt-BR, en-ZA)")
-    location: LocationApproximate
+    # Existing coordinate-bearing clients remain valid. New clients may use an
+    # administrative area without creating a browser location.
+    location: Optional[LocationApproximate] = None
+    administrative_area: Optional[str] = Field(default=None, min_length=2, max_length=160)
     consent: ConsentPayload
     text: Optional[str] = None
 
@@ -33,20 +36,28 @@ class CreateRequestPayload(BaseModel):
             raise ValueError(f"Unsupported country code: {code}. Must be IN, BR, or ZA.")
         return code
 
+    @model_validator(mode="after")
+    def require_public_safe_location_hint(self):
+        if self.location is None and not (self.administrative_area or "").strip():
+            raise ValueError("An administrative area or approximate location is required.")
+        return self
+
 class RequestCreatedData(BaseModel):
     request_id: str
     channel: str
     country_code: str
     language_hint: str
     content_ref: str
-    location: LocationApproximate
+    location: Optional[LocationApproximate] = None
+    administrative_area: Optional[str] = None
     consent: ConsentPayload
     submitted_at: str
 
 class RequestConfirmedData(BaseModel):
     request_id: str
     confirmed_at: str
-    location_confirmed: LocationApproximate
+    location_confirmed: Optional[LocationApproximate] = None
+    administrative_area: Optional[str] = None
     citizen_notes: Optional[str] = None
 
 class CitizenCorrectionPayload(BaseModel):

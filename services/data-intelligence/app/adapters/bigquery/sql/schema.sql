@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.{{DATASET}}.data_sources` (
   publisher STRING NOT NULL, dataset_title STRING NOT NULL, country_code STRING NOT NULL,
   geographic_coverage STRING NOT NULL, time_coverage STRING NOT NULL, retrieved_at DATE NOT NULL,
   license STRING, source_url STRING NOT NULL, transformation_notes STRING NOT NULL, confidence FLOAT64 NOT NULL,
-  freshness_status STRING NOT NULL, synthetic BOOL NOT NULL, is_current BOOL NOT NULL, ingested_at TIMESTAMP NOT NULL
+  freshness_status STRING NOT NULL, synthetic BOOL NOT NULL, classification STRING NOT NULL,
+  is_current BOOL NOT NULL, ingested_at TIMESTAMP NOT NULL
 ) CLUSTER BY country_code,source_id,is_current;
 
 CREATE TABLE IF NOT EXISTS `{{PROJECT_ID}}.{{DATASET}}.admin_units` (
