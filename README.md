@@ -254,8 +254,7 @@ A request is flagged as a duplicate candidate based on a two-stage evaluation:
 
 ```
 civicbridge/
-├── apps/
-│   └── web/                   # Next.js/React frontend application (citizen & staff routes)
+├── frontend/                  # Next.js/React frontend application (citizen & staff routes)
 ├── services/
 │   ├── api/                   # FastAPI backend service (FastAPI endpoints)
 │   ├── citizen_channels/      # Citizen channel handlers, intake & media validation
@@ -332,6 +331,25 @@ civicbridge/
    ```
    The API will be running locally at `http://localhost:8000`. 
    Interactive documentation will be available at `http://localhost:8000/docs` (Swagger UI).
+
+### Frontend Setup (Next.js)
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+
+2. Install Node.js package dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the Next.js development server:
+   ```bash
+   npm run dev
+   ```
+   The web portal will be running locally at `http://localhost:3000`. It will automatically communicate with the FastAPI backend running on port 8000.
+
 
 ### AI Normalization Service (Shreyank)
 
