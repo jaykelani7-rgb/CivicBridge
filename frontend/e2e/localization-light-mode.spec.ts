@@ -10,11 +10,11 @@ test("selected language follows the citizen across pages and the UI is light-onl
   await expect(page.getByText("सुलभता प्राथमिकताएँ")).toBeVisible();
 
   await page.goto("/volunteer");
-  await expect(page.getByRole("heading", { name: "सार्वजनिक बुनियादी ढाँचा अनुरोध" })).toBeVisible();
-  await expect(page.getByText("लिखित रिपोर्ट विकल्प")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "आपके मोहल्ले में किस बात पर ध्यान देना चाहिए?" })).toBeVisible();
+  await expect(page.getByText("समस्या का वर्णन करें")).toBeVisible();
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "hi");
-  await expect(page.getByRole("heading", { name: "सार्वजनिक बुनियादी ढाँचा अनुरोध" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "आपके मोहल्ले में किस बात पर ध्यान देना चाहिए?" })).toBeVisible();
 
   await page.goto("/track");
   await expect(page.getByRole("heading", { name: "भेजी गई रिपोर्ट ट्रैक करें" })).toBeVisible();

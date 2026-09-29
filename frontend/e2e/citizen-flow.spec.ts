@@ -8,12 +8,22 @@ test("citizen submits, sees processing summary, and confirms", async ({ page }) 
 
   await page.goto("/volunteer");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
-  await page.keyboard.press("Tab");
-  await expect(page.locator(":focus")).toBeVisible();
-  await page.getByLabel("Written report alternative").fill("The stormwater drain near the school is blocked.");
+  const skipLink = page.getByRole("link", { name: "Skip to main content" });
+  await skipLink.focus();
+  await expect(skipLink).toBeFocused();
+  await expect(skipLink).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/volunteer#main-content$/);
+  await page.getByLabel("Describe the issue").fill("The stormwater drain near the school is blocked.");
   await page.getByRole("button", { name: /Continue to location/i }).click();
   await expect(page.getByText("No browser location added")).toBeVisible();
   await page.getByLabel("Administrative area or landmark").fill("Ward 42, Jaipur");
+  await page.getByRole("button", { name: /Review report/i }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByLabel("Administrative area or landmark")).toHaveValue("Ward 42, Jaipur");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByLabel("Describe the issue")).toHaveValue("The stormwater drain near the school is blocked.");
+  await page.getByRole("button", { name: /Continue to location/i }).click();
   await page.getByRole("button", { name: /Review report/i }).click();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Submit request" }).click();

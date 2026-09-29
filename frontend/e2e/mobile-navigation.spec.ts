@@ -20,8 +20,8 @@ test.describe("mobile bottom navigation", () => {
     const nav = page.getByRole("navigation", { name: "Primary mobile navigation" });
     await expect(nav).toBeVisible();
     await expect(nav.getByRole("link")).toHaveCount(5);
-    for (const label of ["Home", "Public hotspots", "Submit report", "Track", "More"]) await expect(nav.getByRole("link", { name: label })).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Public hotspots" })).toHaveAttribute("aria-current", "page");
+    for (const label of ["Home", "Explore", "Report", "Track", "More"]) await expect(nav.getByRole("link", { name: label })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Explore" })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: /Analyst|Policy/ })).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     const boxes = await nav.getByRole("link").evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));

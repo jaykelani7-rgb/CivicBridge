@@ -23,7 +23,7 @@ test("public list is privacy-safe, filterable, and carries coordinate-free intak
   await affected.click();
   await expect(page).toHaveURL(/\/volunteer\?/);
   await expect(page.getByText(/nothing is submitted automatically/i)).toBeVisible();
-  await page.getByLabel("Written report alternative").fill("Flooding blocks my route during rainfall.");
+  await page.getByLabel("Describe the issue").fill("Flooding blocks my route during rainfall.");
   await page.getByRole("button", { name: /Continue to location/i }).click();
   await expect(page.getByLabel("Administrative area or landmark")).toHaveValue("Ward 42, Jaipur, Rajasthan");
 });

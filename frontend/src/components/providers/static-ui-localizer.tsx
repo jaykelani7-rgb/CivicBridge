@@ -25,6 +25,7 @@ export function StaticUiLocalizer({ locale }: { locale: PublicLocale }) {
     }
 
     function localizeElement(element: Element) {
+      if (element.closest("script,style,[data-no-ui-translation]")) return;
       let sources = attributeSources.get(element);
       if (!sources) { sources = new Map(); attributeSources.set(element, sources); }
       for (const attribute of localizableAttributes) {
