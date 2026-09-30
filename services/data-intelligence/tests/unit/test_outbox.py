@@ -1,8 +1,10 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
+import pytest
 
 from app.domain.models import Metrics
 from app.services.outbox import OutboxDispatcher
+from app.domain.errors import DependencyError
 
 
 class Repository:
@@ -48,3 +50,29 @@ def test_concurrent_drains_publish_each_outbox_row_once():
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(lambda _: dispatcher.dispatch(), range(2)))
     assert publisher.events == ["event-1"]
+
+
+def test_lost_publish_ack_leaves_stable_event_for_retry():
+    class RecoverableRepository(Repository):
+        def __init__(self):
+            super().__init__()
+            self.failed_attempts = 0
+
+        def mark_outbox_failed(self, event_id, error):
+            self.failed_attempts += 1
+
+    class AckLostPublisher(Publisher):
+        def publish(self, event):
+            super().publish(event)
+            raise RuntimeError("ack lost after publish")
+
+    repository = RecoverableRepository()
+    first = AckLostPublisher()
+    with pytest.raises(DependencyError):
+        OutboxDispatcher(repository, first, Metrics()).dispatch()
+    assert repository.failed_attempts == 1
+    assert not repository.published
+    second = Publisher()
+    assert OutboxDispatcher(repository, second, Metrics()).dispatch() == ["event-1"]
+    assert first.events == second.events == ["event-1"]
+    assert repository.published

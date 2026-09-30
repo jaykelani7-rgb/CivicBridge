@@ -5,12 +5,14 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional
 from packages.contracts import (
+    EventEnvelope,
     Recommendation,
     PolicyDecision,
     Project,
     Milestone,
     ImpactMetric,
 )
+from packages.durable_outbox import dispatch, enqueue, ensure_outbox, pending_count
 
 logger = logging.getLogger("policy-impact-db")
 
@@ -39,12 +41,14 @@ class PolicyImpactRepository:
     def _query(self, query: str) -> str:
         return query.replace("?", "%s") if self._postgres else query
 
-    def _execute_write(self, query: str, params: tuple):
+    def _execute_write(self, query: str, params: tuple, event: Optional[EventEnvelope] = None):
         conn = None
         try:
             conn = self._connect()
             cursor = conn.cursor()
             cursor.execute(self._query(query), params)
+            if event is not None:
+                enqueue(cursor, event, self._postgres)
             conn.commit()
         except Exception as e:
             logger.exception("Policy database write failed")
@@ -139,6 +143,19 @@ class PolicyImpactRepository:
                     recorded_at TEXT NOT NULL
                 )
             """)
+            # Keep legacy duplicate rows intact. The key reserves one canonical
+            # project for each recommendation and serializes future creation.
+            cursor.execute("""CREATE TABLE IF NOT EXISTS project_creation_keys (
+                recommendation_id TEXT PRIMARY KEY, project_id TEXT NOT NULL
+            )""")
+            cursor.execute("""INSERT INTO project_creation_keys(recommendation_id,project_id)
+                SELECT recommendation_id,MIN(project_id) FROM projects
+                WHERE 1=1 GROUP BY recommendation_id
+                ON CONFLICT(recommendation_id) DO NOTHING""")
+            ensure_outbox(cursor)
+            cursor.execute("""CREATE TABLE IF NOT EXISTS inbound_event_receipts (
+                event_id TEXT PRIMARY KEY, recommendation_id TEXT NOT NULL, received_at TEXT NOT NULL
+            )""")
             conn.commit()
             logger.info("Database initialized successfully.")
         except Exception as e:
@@ -149,7 +166,7 @@ class PolicyImpactRepository:
                 conn.close()
 
     # --- Recommendations ---
-    def save_recommendation(self, recommendation: Recommendation) -> Recommendation:
+    def save_recommendation(self, recommendation: Recommendation, event: Optional[EventEnvelope] = None) -> Recommendation:
         data_dict = recommendation.model_dump()
         query = """
             INSERT INTO recommendations (recommendation_id, hotspot_id, evidence_bundle_id, title, data_json, status, created_at, updated_at)
@@ -169,7 +186,7 @@ class PolicyImpactRepository:
             recommendation.created_at,
             recommendation.updated_at,
         )
-        self._execute_write(query, params)
+        self._execute_write(query, params, event)
         self._in_memory_recommendations[recommendation.recommendation_id] = data_dict
         return recommendation
 
@@ -195,6 +212,58 @@ class PolicyImpactRepository:
             results.append(Recommendation(**rec))
         return results
 
+    def get_recommendation_for_inbound_event(self, event_id: str) -> Optional[Recommendation]:
+        row = self._execute_read_one(
+            "SELECT recommendation_id FROM inbound_event_receipts WHERE event_id=?", (event_id,)
+        )
+        return self.get_recommendation(row[0]) if row else None
+
+    def create_recommendation_once(
+        self, recommendation: Recommendation, event: EventEnvelope, inbound_event_id: str
+    ) -> tuple[Recommendation, bool]:
+        """Atomically consume an inbound event and queue its recommendation event."""
+        conn = self._connect()
+        try:
+            if not self._postgres:
+                conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.cursor()
+            cursor.execute(self._query("""
+                INSERT INTO inbound_event_receipts(event_id,recommendation_id,received_at)
+                VALUES(?,?,?) ON CONFLICT(event_id) DO NOTHING
+            """), (inbound_event_id, recommendation.recommendation_id, recommendation.created_at))
+            created = cursor.rowcount == 1
+            if created:
+                cursor.execute(self._query("""
+                    INSERT INTO recommendations(recommendation_id,hotspot_id,evidence_bundle_id,title,data_json,status,created_at,updated_at)
+                    VALUES(?,?,?,?,?,?,?,?)
+                """), (
+                    recommendation.recommendation_id, recommendation.hotspot_id,
+                    recommendation.evidence_bundle_id, recommendation.title,
+                    json.dumps(recommendation.model_dump()), recommendation.status.value,
+                    recommendation.created_at, recommendation.updated_at,
+                ))
+                enqueue(cursor, event, self._postgres)
+                result = recommendation
+            else:
+                cursor.execute(self._query("""
+                    SELECT r.data_json FROM recommendations r
+                    JOIN inbound_event_receipts i ON i.recommendation_id=r.recommendation_id
+                    WHERE i.event_id=?
+                """), (inbound_event_id,))
+                row = cursor.fetchone()
+                if not row:
+                    raise RuntimeError("Inbound event receipt lacks its recommendation")
+                result = Recommendation(**json.loads(row[0]))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+        if created:
+            self._in_memory_recommendations[recommendation.recommendation_id] = recommendation.model_dump()
+        return result, created
+
     # --- Policy Decisions ---
     def save_decision(self, decision: PolicyDecision) -> PolicyDecision:
         data_dict = decision.model_dump()
@@ -214,6 +283,39 @@ class PolicyImpactRepository:
         self._in_memory_decisions[decision.decision_id] = data_dict
         return decision
 
+    def record_decision_with_recommendation(
+        self, recommendation: Recommendation, decision: PolicyDecision, event: EventEnvelope
+    ) -> None:
+        """Commit the status, human decision receipt and event as one unit."""
+        conn = self._connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(self._query("""
+                UPDATE recommendations SET status=?, data_json=?, updated_at=?
+                WHERE recommendation_id=?
+            """), (
+                recommendation.status.value, json.dumps(recommendation.model_dump()),
+                recommendation.updated_at, recommendation.recommendation_id,
+            ))
+            if cursor.rowcount != 1:
+                raise ValueError(f"Recommendation {recommendation.recommendation_id} not found.")
+            cursor.execute(self._query("""
+                INSERT INTO policy_decisions(decision_id,recommendation_id,action,actor_id,data_json,decided_at)
+                VALUES(?,?,?,?,?,?)
+            """), (
+                decision.decision_id, decision.recommendation_id, decision.action.value,
+                decision.actor_id, json.dumps(decision.model_dump()), decision.decided_at,
+            ))
+            enqueue(cursor, event, self._postgres)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+        self._in_memory_recommendations[recommendation.recommendation_id] = recommendation.model_dump()
+        self._in_memory_decisions[decision.decision_id] = decision.model_dump()
+
     def list_decisions_for_recommendation(self, recommendation_id: str) -> List[PolicyDecision]:
         return [PolicyDecision(**json.loads(row[0])) for row in self._execute_read_all(
             "SELECT data_json FROM policy_decisions WHERE recommendation_id = ?",
@@ -221,7 +323,7 @@ class PolicyImpactRepository:
         )]
 
     # --- Projects ---
-    def save_project(self, project: Project) -> Project:
+    def save_project(self, project: Project, event: Optional[EventEnvelope] = None) -> Project:
         data_dict = project.model_dump()
         query = """
             INSERT INTO projects (project_id, recommendation_id, hotspot_id, title, status, data_json, created_at, updated_at)
@@ -241,9 +343,59 @@ class PolicyImpactRepository:
             project.created_at,
             project.updated_at,
         )
-        self._execute_write(query, params)
+        self._execute_write(query, params, event)
         self._in_memory_projects[project.project_id] = data_dict
         return project
+
+    def get_project_by_recommendation(self, recommendation_id: str) -> Optional[Project]:
+        row = self._execute_read_one(
+            """SELECT p.data_json FROM projects p
+               JOIN project_creation_keys k ON k.project_id=p.project_id
+               WHERE k.recommendation_id = ?""", (recommendation_id,)
+        )
+        return Project(**json.loads(row[0])) if row else None
+
+    def create_project_once(self, project: Project, event: EventEnvelope) -> tuple[Project, bool]:
+        """One project per recommendation, including concurrent/retried requests."""
+        conn = self._connect()
+        try:
+            if not self._postgres:
+                conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.cursor()
+            cursor.execute(self._query("""
+                INSERT INTO project_creation_keys(recommendation_id,project_id)
+                VALUES(?,?) ON CONFLICT(recommendation_id) DO NOTHING
+            """), (project.recommendation_id, project.project_id))
+            created = cursor.rowcount == 1
+            if created:
+                cursor.execute(self._query("""
+                    INSERT INTO projects(project_id,recommendation_id,hotspot_id,title,status,data_json,created_at,updated_at)
+                    VALUES(?,?,?,?,?,?,?,?)
+                """), (
+                    project.project_id, project.recommendation_id, project.hotspot_id, project.title,
+                    project.status.value, json.dumps(project.model_dump()), project.created_at, project.updated_at,
+                ))
+                enqueue(cursor, event, self._postgres)
+                result = project
+            else:
+                cursor.execute(self._query(
+                    """SELECT p.data_json FROM projects p
+                       JOIN project_creation_keys k ON k.project_id=p.project_id
+                       WHERE k.recommendation_id=?"""
+                ), (project.recommendation_id,))
+                row = cursor.fetchone()
+                if not row:
+                    raise RuntimeError("Project uniqueness conflict could not be resolved")
+                result = Project(**json.loads(row[0]))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+        if created:
+            self._in_memory_projects[project.project_id] = project.model_dump()
+        return result, created
 
     def get_project(self, project_id: str) -> Optional[Project]:
         row = self._execute_read_one(
@@ -289,7 +441,7 @@ class PolicyImpactRepository:
         )]
         return [Milestone(**m) for m in persisted]
 
-    def add_metric(self, metric: ImpactMetric) -> ImpactMetric:
+    def add_metric(self, metric: ImpactMetric, event: Optional[EventEnvelope] = None) -> ImpactMetric:
         data_dict = metric.model_dump()
         query = """
             INSERT INTO impact_metrics (metric_id, project_id, metric_code, data_json, recorded_at)
@@ -302,7 +454,7 @@ class PolicyImpactRepository:
             json.dumps(data_dict),
             metric.recorded_at,
         )
-        self._execute_write(query, params)
+        self._execute_write(query, params, event)
         self._in_memory_metrics.setdefault(metric.project_id, []).append(data_dict)
         return metric
 
@@ -312,13 +464,25 @@ class PolicyImpactRepository:
         )]
         return [ImpactMetric(**m) for m in persisted]
 
+    def dispatch_pending(self, publisher, *, fail_on_error: bool = False) -> List[str]:
+        try:
+            return dispatch(self._connect, self._postgres, publisher)
+        except Exception:
+            logger.exception("Policy event dispatch failed; committed events remain pending for replay")
+            if fail_on_error:
+                raise
+            return []
+
+    def pending_event_count(self) -> int:
+        return pending_count(self._connect)
+
     def clear(self):
         self._in_memory_recommendations.clear()
         self._in_memory_decisions.clear()
         self._in_memory_projects.clear()
         self._in_memory_milestones.clear()
         self._in_memory_metrics.clear()
-        for table in ("impact_metrics", "milestones", "projects", "policy_decisions", "recommendations"):
+        for table in ("project_creation_keys", "inbound_event_receipts", "outbox_events", "impact_metrics", "milestones", "projects", "policy_decisions", "recommendations"):
             self._execute_write(f"DELETE FROM {table}", ())
 
 

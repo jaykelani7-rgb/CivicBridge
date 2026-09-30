@@ -29,6 +29,11 @@ class ProjectImpactService:
     def create_project(self, req: ProjectCreateRequest) -> Project:
         now_str = datetime.now(timezone.utc).isoformat()
 
+        existing = self.repo.get_project_by_recommendation(req.recommendation_id)
+        if existing:
+            self.repo.dispatch_pending(self.event_bus)
+            return existing
+
         # 1. Verify recommendation exists and human policy approval was recorded
         rec = self.repo.get_recommendation(req.recommendation_id)
         if not rec:
@@ -56,22 +61,18 @@ class ProjectImpactService:
             updated_at=now_str,
         )
 
-        for m in project.milestones:
-            m.project_id = project.project_id
-            self.repo.add_milestone(m)
-
-        # 3. Save to database
-        self.repo.save_project(project)
-
-        # 4. Publish project.status.updated.v1 event
+        # Commit the project and status event together. A reservation row for
+        # the recommendation also protects concurrent retries from duplicates.
         event = EventEnvelope(
             event_type="project.status.updated.v1",
             producer="policy-impact",
             data=project.model_dump(),
         )
-        self.event_bus.publish(event)
+        project, created = self.repo.create_project_once(project, event)
+        self.repo.dispatch_pending(self.event_bus)
 
-        logger.info(f"[ProjectImpactService] Created project {project.project_id} from recommendation {rec.recommendation_id}")
+        if created:
+            logger.info(f"[ProjectImpactService] Created project {project.project_id} from recommendation {rec.recommendation_id}")
         return project
 
     def get_project(self, project_id: str) -> Optional[Project]:
@@ -84,12 +85,16 @@ class ProjectImpactService:
         project = self.repo.get_project(project_id)
         if not project:
             raise ValueError(f"Project {project_id} not found.")
+        if project.status == req.status:
+            self.repo.dispatch_pending(self.event_bus)
+            return project
         project.status = req.status
         project.updated_at = datetime.now(timezone.utc).isoformat()
-        self.repo.save_project(project)
-        self.event_bus.publish(EventEnvelope(
+        event = EventEnvelope(
             event_type="project.status.updated.v1", producer="policy-impact", data=project.model_dump()
-        ))
+        )
+        self.repo.save_project(project, event)
+        self.repo.dispatch_pending(self.event_bus)
         return project
 
     def list_projects(self, status: Optional[str] = None) -> List[Project]:
@@ -146,15 +151,13 @@ class ProjectImpactService:
             recorded_at=now_str,
         )
 
-        self.repo.add_metric(metric)
-
-        # Publish impact.metric.updated.v1 event
         event = EventEnvelope(
             event_type="impact.metric.updated.v1",
             producer="policy-impact",
             data=metric.model_dump(),
         )
-        self.event_bus.publish(event)
+        self.repo.add_metric(metric, event)
+        self.repo.dispatch_pending(self.event_bus)
 
         logger.info(
             f"[ProjectImpactService] Added impact metric {metric.metric_code} (status: {outcome_status}) to project {project_id}"

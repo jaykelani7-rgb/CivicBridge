@@ -84,6 +84,8 @@ class NormalizationService:
         """
         existing = self.repo.get(request_id)
         if existing and not force:
+            if self.repo.database_url:
+                self.repo.dispatch_pending(self.event_bus)
             return existing, False
 
         content = self.citizen_client.get_content(request_id)
@@ -197,8 +199,6 @@ class NormalizationService:
         )
 
         status = "needs_review" if needs_review else "normalized"
-        record = self.repo.save(request_id, result, status)
-
         event_type = "request.needs_review.v1" if needs_review else "request.normalized.v1"
         event = EventEnvelope(
             event_type=event_type,
@@ -206,7 +206,17 @@ class NormalizationService:
             data=result.model_dump(),
             **({"trace_id": trace_id} if trace_id else {}),
         )
-        self.event_bus.publish(event)
+        if self.repo.database_url and not force:
+            record, created = self.repo.save_if_absent(request_id, result, status, event)
+            if not created:
+                self.repo.dispatch_pending(self.event_bus)
+                return record, False
+        else:
+            record = self.repo.save(request_id, result, status, event if self.repo.database_url else None)
+        if self.repo.database_url:
+            self.repo.dispatch_pending(self.event_bus)
+        else:
+            self.event_bus.publish(event)
 
         logger.info(
             "Normalized request %s -> %s (category=%s, confidence=%.2f, stt=%s, translation=%s, extraction=%s)",
@@ -251,9 +261,12 @@ class NormalizationService:
             data=approved_result.model_dump(),
             **({"trace_id": trace_id} if trace_id else {}),
         )
-        self.event_bus.publish(event)
         record.record_approval(approved_result, reviewer_id, reviewer_role)
-        self.repo.persist(record)
+        self.repo.persist(record, event if self.repo.database_url else None)
+        if self.repo.database_url:
+            self.repo.dispatch_pending(self.event_bus)
+        else:
+            self.event_bus.publish(event)
         logger.info(
             "Human review approved request %s (reviewer_role=%s)",
             request_id,

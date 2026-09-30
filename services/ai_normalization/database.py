@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from packages.contracts.normalization import NormalizedRequestData
+from packages.contracts.envelope import EventEnvelope
+from packages.durable_outbox import dispatch, enqueue, ensure_outbox, pending_count
 
 
 class NormalizationRecord:
@@ -67,7 +69,23 @@ class NormalizationRepository:
             if not self.postgres:
                 Path(self.database_url).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
             with self._db() as connection:
-                connection.cursor().execute("CREATE TABLE IF NOT EXISTS normalization_records (request_id TEXT PRIMARY KEY, data_json TEXT NOT NULL)")
+                cursor = connection.cursor()
+                cursor.execute("CREATE TABLE IF NOT EXISTS normalization_records (request_id TEXT PRIMARY KEY, data_json TEXT NOT NULL)")
+                ensure_outbox(cursor)
+
+    def _connect(self):
+        if self.postgres:
+            import psycopg
+            return psycopg.connect(self.database_url)
+        return sqlite3.connect(self.database_url, timeout=30)
+
+    def dispatch_pending(self, publisher) -> list[str]:
+        if not self.database_url:
+            return []
+        return dispatch(self._connect, self.postgres, publisher)
+
+    def pending_event_count(self) -> int:
+        return pending_count(self._connect) if self.database_url else 0
 
     @contextmanager
     def _db(self):
@@ -85,21 +103,51 @@ class NormalizationRepository:
         finally:
             connection.close()
 
-    def persist(self, record: NormalizationRecord):
+    @staticmethod
+    def _record_data(record: NormalizationRecord) -> dict:
+        return {
+            "request_id": record.request_id, "result": record.result.model_dump(),
+            "status": record.status, "attempts": record.attempts,
+            "created_at": record.created_at, "updated_at": record.updated_at,
+            "history": record.history, "reviewed_at": record.reviewed_at,
+            "reviewed_by": record.reviewed_by, "reviewer_role": record.reviewer_role,
+        }
+
+    def persist(self, record: NormalizationRecord, event: Optional[EventEnvelope] = None):
         if self.database_url:
-            data = {
-                "request_id": record.request_id, "result": record.result.model_dump(),
-                "status": record.status, "attempts": record.attempts,
-                "created_at": record.created_at, "updated_at": record.updated_at,
-                "history": record.history, "reviewed_at": record.reviewed_at,
-                "reviewed_by": record.reviewed_by, "reviewer_role": record.reviewer_role,
-            }
             query = "INSERT INTO normalization_records(request_id,data_json) VALUES(?,?) ON CONFLICT(request_id) DO UPDATE SET data_json=excluded.data_json"
             if self.postgres:
                 query = query.replace("?", "%s")
             with self._db() as connection:
-                connection.cursor().execute(query, (record.request_id, json.dumps(data)))
+                cursor = connection.cursor()
+                cursor.execute(query, (record.request_id, json.dumps(self._record_data(record))))
+                if event is not None:
+                    enqueue(cursor, event, self.postgres)
         self._records[record.request_id] = record
+
+    def save_if_absent(self, request_id: str, result: NormalizedRequestData,
+                       status: str, event: EventEnvelope) -> tuple[NormalizationRecord, bool]:
+        """Deduplicate concurrent inbound deliveries across service instances."""
+        if not self.database_url:
+            existing = self.get(request_id)
+            return (existing, False) if existing else (self.save(request_id, result, status), True)
+        record = NormalizationRecord(request_id, result, status)
+        query = "INSERT INTO normalization_records(request_id,data_json) VALUES(?,?) ON CONFLICT(request_id) DO NOTHING"
+        if self.postgres:
+            query = query.replace("?", "%s")
+        with self._db() as connection:
+            cursor = connection.cursor()
+            cursor.execute(query, (request_id, json.dumps(self._record_data(record))))
+            created = cursor.rowcount == 1
+            if created:
+                enqueue(cursor, event, self.postgres)
+        if created:
+            self._records[request_id] = record
+            return record, True
+        existing = self.get(request_id)
+        if existing is None:
+            raise RuntimeError("Normalization uniqueness conflict lacks a committed result")
+        return existing, False
 
     def get(self, request_id: str) -> Optional[NormalizationRecord]:
         if self.database_url:
@@ -118,14 +166,14 @@ class NormalizationRepository:
     def exists(self, request_id: str) -> bool:
         return self.get(request_id) is not None
 
-    def save(self, request_id: str, result: NormalizedRequestData, status: str) -> NormalizationRecord:
+    def save(self, request_id: str, result: NormalizedRequestData, status: str, event: Optional[EventEnvelope] = None) -> NormalizationRecord:
         existing = self.get(request_id)
         if existing:
             existing.record_attempt(result, status)
-            self.persist(existing)
+            self.persist(existing, event)
             return existing
         record = NormalizationRecord(request_id, result, status)
-        self.persist(record)
+        self.persist(record, event)
         return record
 
     def list_needs_review(self) -> List[NormalizationRecord]:
@@ -139,6 +187,7 @@ class NormalizationRepository:
         if self.database_url:
             with self._db() as connection:
                 connection.cursor().execute("DELETE FROM normalization_records")
+                connection.cursor().execute("DELETE FROM outbox_events")
         self._records.clear()
 
 

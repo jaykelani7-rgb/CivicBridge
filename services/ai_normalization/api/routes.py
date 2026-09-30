@@ -143,6 +143,11 @@ def consume_citizen_event(payload: dict, request: Request):
     try:
         claim = ledger.begin(event_id, event_type, request_id, event.schema_version) if ledger else "acquired"
         if claim == "duplicate":
+            repository = request.app.state.repository
+            if not repository.exists(request_id):
+                return Response(status_code=503)
+            if repository.database_url:
+                repository.dispatch_pending(request.app.state.event_bus)
             logger.info("pubsub_event_processed", extra={"pubsub_message_id": message_id, "event_id": event_id, "event_type": event_type, "result": "success", "duplicate_delivery": True})
             return Response(status_code=204)
         if claim != "acquired":

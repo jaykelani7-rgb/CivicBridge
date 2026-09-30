@@ -56,9 +56,9 @@ test('capture responsive policy workspace and decision drawer fixtures',async({p
   await page.getByRole('navigation',{name:'Mobile policy sections'}).getByRole('button',{name:'Brief'}).click();
   await page.getByRole('button',{name:'Record decision'}).click();
   await expect(page.getByRole('dialog',{name:'Decision drawer fixture'})).toBeVisible();
-  await page.screenshot({path:`${directory}/decision-mobile.png`,fullPage:true});
+  await page.screenshot({path:`${directory}/decision-mobile.png`});
   await page.getByRole('button',{name:'Close'}).click();
   await page.setViewportSize({width:1440,height:900});
   await page.getByRole('button',{name:'Record decision'}).click();
-  await page.screenshot({path:`${directory}/decision-desktop.png`,fullPage:true});
+  await page.screenshot({path:`${directory}/decision-desktop.png`});
 });

@@ -17,6 +17,7 @@ Run directly:
     uvicorn services.ai_normalization.main:app --host 127.0.0.1 --port 8001 --reload
 """
 import logging
+import asyncio
 from typing import Optional
 from uuid import uuid4
 
@@ -28,6 +29,7 @@ from fastapi.responses import JSONResponse
 from packages.event_bus.bus import EventBus, event_bus as shared_event_bus
 from packages.cloud_runtime import BigQueryDeliveryLedger, PubSubEventBus
 from packages.pubsub_push import decode_push_event, verify_push_request
+from packages.durable_outbox import poll_forever
 
 from services.ai_normalization.api.errors import NormalizationAPIError
 from services.ai_normalization.api.routes import router
@@ -119,6 +121,33 @@ def create_app(
     )
 
     app.include_router(router)
+
+    @app.on_event("startup")
+    def recover_committed_events() -> None:
+        if repository.database_url:
+            try:
+                repository.dispatch_pending(event_bus)
+            except Exception:
+                logging.getLogger("normalization-outbox").exception(
+                    "Startup outbox replay failed; committed events remain pending"
+                )
+
+    @app.on_event("startup")
+    async def start_outbox_retry() -> None:
+        if repository.database_url:
+            app.state.outbox_task = asyncio.create_task(poll_forever(
+                lambda: repository.dispatch_pending(event_bus), logging.getLogger("normalization-outbox")
+            ))
+
+    @app.on_event("shutdown")
+    async def stop_outbox_retry() -> None:
+        task = getattr(app.state, "outbox_task", None)
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     @app.post("/internal/v1/events/pubsub", status_code=204)
     def receive_created_event_push(request: Request, payload: dict):

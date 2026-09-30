@@ -10,8 +10,10 @@ from typing import Any, Dict, List, Optional
 
 from packages.contracts.citizen import (
     CitizenCorrectionPayload, CitizenStatusResponse, ContentRetrievalResponse,
-    CreateRequestPayload, LocationApproximate,
+    CreateRequestPayload, LocationApproximate, RequestCreatedData, RequestConfirmedData,
 )
+from packages.contracts.envelope import EventEnvelope
+from packages.durable_outbox import ensure_outbox, enqueue, dispatch, pending_count
 
 
 class CitizenStorage:
@@ -57,6 +59,54 @@ class CitizenStorage:
             cursor.execute("CREATE TABLE IF NOT EXISTS citizen_media (media_ref TEXT PRIMARY KEY, request_id TEXT NOT NULL, storage_key TEXT NOT NULL, filename TEXT NOT NULL, media_type TEXT NOT NULL, size_bytes INTEGER NOT NULL)")
             cursor.execute("CREATE TABLE IF NOT EXISTS citizen_event_receipts (event_id TEXT PRIMARY KEY, processed_at TEXT NOT NULL)")
             cursor.execute("CREATE TABLE IF NOT EXISTS citizen_channel_sessions (channel_id TEXT PRIMARY KEY, data_json TEXT NOT NULL)")
+            cursor.execute("CREATE TABLE IF NOT EXISTS citizen_inbound_events (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, payload_json TEXT NOT NULL, received_at TEXT NOT NULL, applied_at TEXT)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS citizen_inbound_events_pending_idx ON citizen_inbound_events(applied_at)")
+            ensure_outbox(cursor)
+
+    def _connect(self):
+        if self.postgres:
+            import psycopg
+            return psycopg.connect(self.database_url)
+        return sqlite3.connect(self.database_url, timeout=30)
+
+    def _created_event(self, record: Dict[str, Any]) -> EventEnvelope:
+        return EventEnvelope(
+            event_id=self.created_event_id(record), event_type="request.created.v1", producer="citizen-channels",
+            trace_id=record.get("trace_id") or self.created_event_id(record),
+            data=RequestCreatedData(
+                request_id=record["request_id"], channel=record["channel"], country_code=record["country_code"],
+                language_hint=record["language_hint"], content_ref=record["content_ref"],
+                location=LocationApproximate(**record["location"]) if record.get("location") else None,
+                administrative_area=record.get("administrative_area"), consent=record["consent"],
+                submitted_at=record["submitted_at"],
+            ).model_dump(),
+        )
+
+    @staticmethod
+    def created_event_id(record: Dict[str, Any]) -> str:
+        # Pre-outbox records lack this field. A namespace UUID keeps replay
+        # stable across processes without rewriting an old citizen record.
+        return record.get("created_event_id") or str(uuid.uuid5(
+            uuid.NAMESPACE_URL, f"civicbridge:request.created.v1:{record['request_id']}"
+        ))
+
+    def ensure_created_outbox(self, request_id: str) -> None:
+        record = self._read(request_id)
+        if not record or record.get("event_published") or (record["channel"].endswith("_voice") and not record.get("media_ref")):
+            return
+        with self._db() as connection:
+            enqueue(connection.cursor(), self._created_event(record), self.postgres)
+
+    def dispatch_outbox(self, publisher: Any) -> List[str]:
+        return dispatch(self._connect, self.postgres, publisher)
+
+    def pending_outbox_count(self) -> int:
+        return pending_count(self._connect)
+
+    def outbox_published(self, event_id: str) -> bool:
+        with self._db() as connection:
+            row = connection.cursor().execute(self._sql("SELECT published_at FROM outbox_events WHERE event_id = ?"), (event_id,)).fetchone()
+        return bool(row and row[0])
 
     def _read(self, request_id: str) -> Optional[Dict[str, Any]]:
         with self._db() as connection:
@@ -83,13 +133,25 @@ class CitizenStorage:
         return self._read(request_id)
 
     def mark_published(self, request_id: str):
-        record = self._read(request_id)
-        if record:
+        with self._db() as connection:
+            if not self.postgres:
+                connection.execute("BEGIN IMMEDIATE")
+            query = "SELECT data_json FROM citizen_requests WHERE request_id=?"
+            if self.postgres:
+                query = "SELECT data_json FROM citizen_requests WHERE request_id=%s FOR UPDATE"
+            cursor = connection.cursor()
+            row = cursor.execute(query, (request_id,)).fetchone()
+            if not row:
+                return
+            record = json.loads(row[0])
             record["event_published"] = True
-            record["processing_stage"] = "submitted"
-            self._save(record)
+            if record.get("processing_stage") == "awaiting_media":
+                record["processing_stage"] = "submitted"
+            cursor.execute(self._sql("UPDATE citizen_requests SET data_json=? WHERE request_id=?"),
+                           (json.dumps(record), request_id))
+        self.requests[request_id] = record
 
-    def create_request(self, payload: CreateRequestPayload, idempotency_key: Optional[str] = None) -> str:
+    def create_request(self, payload: CreateRequestPayload, idempotency_key: Optional[str] = None, trace_id: Optional[str] = None) -> str:
         if idempotency_key:
             with self._db() as connection:
                 row = connection.cursor().execute(self._sql("SELECT request_id FROM citizen_requests WHERE idempotency_key = ?"), (idempotency_key,)).fetchone()
@@ -106,6 +168,7 @@ class CitizenStorage:
             "content_ref": f"private://citizen-content/{request_id}",
             "processing_stage": "awaiting_media" if payload.channel.endswith("_voice") else "submitted", "event_published": False, "category": None, "public_summary": None,
             "created_event_id": str(uuid.uuid4()),
+            "trace_id": trace_id,
             "hotspot_score": None, "hotspot_id": None, "recommendation_id": None,
             "project_id": None, "project_title": None, "project_status": None,
             "normalized_summary": None, "processing_mode": None, "outcome_status": None, "measurement_source_type": None,
@@ -113,7 +176,10 @@ class CitizenStorage:
         }
         try:
             with self._db() as connection:
-                connection.cursor().execute(self._sql("INSERT INTO citizen_requests(request_id,data_json,idempotency_key) VALUES(?,?,?)"), (request_id, json.dumps(record), idempotency_key))
+                cursor = connection.cursor()
+                cursor.execute(self._sql("INSERT INTO citizen_requests(request_id,data_json,idempotency_key) VALUES(?,?,?)"), (request_id, json.dumps(record), idempotency_key))
+                if not payload.channel.endswith("_voice"):
+                    enqueue(cursor, self._created_event(record), self.postgres)
         except Exception as error:
             if not idempotency_key:
                 raise
@@ -143,14 +209,27 @@ class CitizenStorage:
                 os.chmod(path, 0o600)
                 output.write(content)
         media_ref = f"private://citizen-media/{storage_key}"
-        with self._db() as connection:
-            connection.cursor().execute(self._sql("INSERT INTO citizen_media(media_ref,request_id,storage_key,filename,media_type,size_bytes) VALUES(?,?,?,?,?,?)"), (media_ref, req_id, storage_key, filename, media_type, len(content)))
         item = {"media_ref": media_ref, "filename": filename, "media_type": media_type, "size_bytes": len(content)}
-        record.setdefault("media", []).append(item)
-        if media_type.startswith("audio/") and not record.get("media_ref"):
-            record["media_ref"] = media_ref
-            record["media_type"] = media_type
-        self._save(record)
+        with self._db() as connection:
+            if not self.postgres:
+                connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.cursor()
+            query = "SELECT data_json FROM citizen_requests WHERE request_id=?"
+            if self.postgres:
+                query = "SELECT data_json FROM citizen_requests WHERE request_id=%s FOR UPDATE"
+            row = cursor.execute(query, (req_id,)).fetchone()
+            if not row:
+                raise KeyError(f"Request {req_id} not found")
+            record = json.loads(row[0])
+            record.setdefault("media", []).append(item)
+            if media_type.startswith("audio/") and not record.get("media_ref"):
+                record["media_ref"] = media_ref
+                record["media_type"] = media_type
+            cursor.execute(self._sql("INSERT INTO citizen_media(media_ref,request_id,storage_key,filename,media_type,size_bytes) VALUES(?,?,?,?,?,?)"), (media_ref, req_id, storage_key, filename, media_type, len(content)))
+            cursor.execute(self._sql("UPDATE citizen_requests SET data_json = ? WHERE request_id = ?"), (json.dumps(record), req_id))
+            if record["channel"].endswith("_voice") and media_type.startswith("audio/") and not record.get("event_published"):
+                enqueue(cursor, self._created_event(record), self.postgres)
+        self.requests[req_id] = record
         return media_ref
 
     def get_media(self, request_id: str, media_ref: str) -> Optional[tuple[bytes, str]]:
@@ -170,12 +249,27 @@ class CitizenStorage:
         record = self._read(req_id)
         if not record:
             raise KeyError(req_id)
+        if record.get("confirmed_at"):
+            return record
         record["confirmed_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        record["confirmed_event_id"] = str(uuid.uuid4())
         if location:
             record["location"] = location.model_dump()
         if notes:
             record["confirmation_notes"] = notes
-        self._save(record)
+        event = EventEnvelope(
+            event_id=record["confirmed_event_id"], event_type="request.confirmed.v1", producer="citizen-channels",
+            data=RequestConfirmedData(
+                request_id=req_id, confirmed_at=record["confirmed_at"],
+                location_confirmed=LocationApproximate(**record["location"]) if record.get("location") else None,
+                administrative_area=record.get("administrative_area"), citizen_notes=notes,
+            ).model_dump(),
+        )
+        with self._db() as connection:
+            cursor = connection.cursor()
+            cursor.execute(self._sql("UPDATE citizen_requests SET data_json = ? WHERE request_id = ?"), (json.dumps(record), req_id))
+            enqueue(cursor, event, self.postgres)
+        self.requests[req_id] = record
         return record
 
     def add_correction(self, req_id: str, payload: CitizenCorrectionPayload):

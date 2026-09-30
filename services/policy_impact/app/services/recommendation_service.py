@@ -48,7 +48,12 @@ class RecommendationService:
         )
         self.event_bus = get_event_bus()
 
-    def create_recommendation(self, req: RecommendationCreateRequest) -> Recommendation:
+    def create_recommendation(self, req: RecommendationCreateRequest, *, inbound_event_id: Optional[str] = None) -> Recommendation:
+        if inbound_event_id:
+            existing = self.repo.get_recommendation_for_inbound_event(inbound_event_id)
+            if existing:
+                self.repo.dispatch_pending(self.event_bus)
+                return existing
         now_str = datetime.now(timezone.utc).isoformat()
 
         # 1. Fetch bounded evidence bundle from Jay's Data Intelligence service
@@ -116,16 +121,17 @@ class RecommendationService:
             updated_at=now_str,
         )
 
-        # 5. Persist to DB
-        self.repo.save_recommendation(rec)
-
-        # 6. Publish recommendation.created.v1 event
+        # Persist the recommendation and event in one database transaction.
         event = EventEnvelope(
             event_type="recommendation.created.v1",
             producer="policy-impact",
             data=rec.model_dump(),
         )
-        self.event_bus.publish(event)
+        if inbound_event_id:
+            rec, _ = self.repo.create_recommendation_once(rec, event, inbound_event_id)
+        else:
+            self.repo.save_recommendation(rec, event)
+        self.repo.dispatch_pending(self.event_bus)
 
         logger.info(f"[RecommendationService] Created recommendation {rec.recommendation_id}")
         return rec

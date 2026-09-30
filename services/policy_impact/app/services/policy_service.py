@@ -54,9 +54,7 @@ class PolicyService:
 
         rec.status = new_status
         rec.updated_at = now_str
-        self.repo.save_recommendation(rec)
-
-        # 2. Record policy decision audit
+        # Record the decision and recommendation status together.
         decision = PolicyDecision(
             decision_id=str(uuid4()),
             recommendation_id=recommendation_id,
@@ -66,9 +64,6 @@ class PolicyService:
             actor_role=req.actor_role,
             decided_at=now_str,
         )
-        self.repo.save_decision(decision)
-
-        # 3. Publish policy.decision.recorded.v1 event
         event = EventEnvelope(
             event_type="policy.decision.recorded.v1",
             producer="policy-impact",
@@ -78,7 +73,8 @@ class PolicyService:
                 "human_approved": rec.human_approved,
             },
         )
-        self.event_bus.publish(event)
+        self.repo.record_decision_with_recommendation(rec, decision, event)
+        self.repo.dispatch_pending(self.event_bus)
 
         logger.info(
             f"[PolicyService] Recorded decision {decision.decision_id} ({req.action.value}) for recommendation {recommendation_id}"

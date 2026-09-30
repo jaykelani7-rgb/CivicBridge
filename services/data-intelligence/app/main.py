@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
@@ -35,6 +37,7 @@ from app.services.scoring import ScoringEngine
 from app.workers.consumer import NormalizedRequestConsumer
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+logger = logging.getLogger("data-intelligence.outbox")
 
 
 def _error(code: str, message: str, retryable: bool, details: list, trace_id: str, status: int) -> JSONResponse:
@@ -90,10 +93,38 @@ def create_app(settings: Optional[Settings] = None, *, publisher=None) -> FastAP
     app.state.primary_analytical_repository = primary_analytical_repository
     app.state.primary_geography_provider = primary_geography
     app.state.pipeline,app.state.consumer,app.state.metrics = pipeline,NormalizedRequestConsumer(pipeline),metrics
+    app.state.outbox = outbox
     app.state.delivery_idempotency = (BigQueryDeliveryIdempotencyStore(
         settings.bigquery_project or "", settings.bigquery_dataset or "", settings.bigquery_location
     ) if settings.idempotency_backend == "bigquery" else PipelineDeliveryIdempotencyStore())
     app.include_router(router)
+
+    @app.on_event("startup")
+    async def start_outbox_retry() -> None:
+        try:
+            await asyncio.to_thread(outbox.dispatch)
+        except Exception:
+            logger.exception("Startup outbox replay failed; committed events remain pending")
+
+        async def retry_forever() -> None:
+            while True:
+                await asyncio.sleep(5)
+                try:
+                    await asyncio.to_thread(outbox.dispatch)
+                except Exception:
+                    logger.exception("Outbox retry failed; committed events remain pending")
+
+        app.state.outbox_task = asyncio.create_task(retry_forever())
+
+    @app.on_event("shutdown")
+    async def stop_outbox_retry() -> None:
+        task = getattr(app.state, "outbox_task", None)
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     @app.exception_handler(DomainError)
     async def domain_error(request: Request, exc: DomainError):

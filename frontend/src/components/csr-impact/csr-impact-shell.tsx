@@ -50,6 +50,8 @@ export function CSRImpactShell({ context }: { context?: { hotspotId: string; bun
     const drawer = drawerRef.current;
     drawer?.querySelector<HTMLElement>("button,textarea,input")?.focus();
     function onKeyDown(event: KeyboardEvent) {
+      // The confirmation dialog owns focus while it is stacked over this drawer.
+      if (document.querySelector('[role="alertdialog"][aria-modal="true"]')) return;
       if (event.key === "Escape") { setDrawerOpen(false); return; }
       if (event.key !== "Tab" || !drawer) return;
       const focusable = [...drawer.querySelectorAll<HTMLElement>('button:not([disabled]),textarea:not([disabled]),input:not([disabled]),a[href]')];
@@ -162,7 +164,28 @@ export function Brief({ item, className }: { item: Recommendation; className?: s
 export function DecisionRail({ item, note, setNote, reason, setReason, pending, receipt, confirm, createProject, project, projectPending, className }: { item: Recommendation; note: string; setNote: (value:string)=>void; reason:string; setReason:(value:string)=>void; pending:boolean; receipt:PolicyDecision|null; confirm:(action:DecisionAction)=>void; createProject:()=>void; project?:DevelopmentProject; projectPending:boolean; className?:string }) {
   return <div className={`mt-6 space-y-5 ${className ?? ""}`}><Field label="Private working note (this browser tab only)"><Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Draft your review note" /></Field><Field label="Decision reason"><Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Why are you making this decision?" /></Field><p className="text-sm text-muted-foreground">A decision is saved only after you confirm it.</p><div className="grid gap-2"><Button variant="outline" disabled={pending} onClick={() => confirm("request_evidence")}>Request more evidence</Button><Button variant="outline" disabled={pending} onClick={() => confirm("defer")}>Defer</Button><Button variant="outline" disabled={pending} onClick={() => confirm("reject")}>Reject</Button><Button disabled={pending || item.human_approved} onClick={() => confirm("approve_for_assessment")}>{item.human_approved ? "Approval recorded" : "Approve for assessment"}</Button></div>{receipt ? <p role="status" className="rounded-lg bg-success/10 p-3">Decision recorded: {receipt.action.replaceAll("_", " ")}</p> : null}{item.human_approved && <div className="border-t border-border pt-4">{project ? <p>Project candidate: {project.title}</p> : <Button disabled={projectPending} onClick={createProject}>Create project candidate</Button>}</div>}</div>;
 }
-function ConfirmDecision({ action, item, reason, setReason, pending, close, submit }: { action:DecisionAction; item:Recommendation; reason:string; setReason:(value:string)=>void; pending:boolean; close:()=>void; submit:()=>void }) { const requiresReason = action !== "approve_for_assessment"; return <div className="fixed inset-0 z-[80] flex items-end bg-black/50 sm:items-center sm:justify-center" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) close(); }}><section role="alertdialog" aria-modal="true" aria-labelledby="decision-dialog-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-card p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:max-w-lg sm:rounded-3xl"><div className="flex items-center justify-between"><h2 id="decision-dialog-title" className="text-2xl font-normal">Confirm policy decision</h2><Button size="icon" variant="ghost" disabled={pending} onClick={close} aria-label="Close decision confirmation"><X className="h-5 w-5"/></Button></div><p className="mt-3 text-sm text-muted-foreground">You are about to record <strong className="capitalize">{action.replaceAll("_", " ")}</strong> for “{item.title}”. This is an auditable backend mutation.</p><Field label={requiresReason ? "Reason (required)" : "Approval note (optional)"}><Textarea autoFocus value={reason} onChange={(event) => setReason(event.target.value)}/></Field><div className="mt-5 flex gap-2"><Button variant="ghost" disabled={pending} onClick={close}>Cancel</Button><Button className="flex-1" disabled={pending || (requiresReason && reason.trim().length < 3)} onClick={submit}>{pending ? "Recording…" : "Record decision"}</Button></div></section></div>; }
+function ConfirmDecision({ action, item, reason, setReason, pending, close, submit }: { action:DecisionAction; item:Recommendation; reason:string; setReason:(value:string)=>void; pending:boolean; close:()=>void; submit:()=>void }) {
+  const requiresReason = action !== "approve_for_assessment";
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef(close);
+  useEffect(() => { closeRef.current = close; }, [close]);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLElement>("textarea")?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !pending) { event.preventDefault(); closeRef.current(); return; }
+      if (event.key !== "Tab" || !dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>('button:not([disabled]),textarea:not([disabled]),input:not([disabled])')];
+      if (!focusable.length) return;
+      if (event.shiftKey && document.activeElement === focusable[0]) { event.preventDefault(); focusable[focusable.length - 1].focus(); }
+      else if (!event.shiftKey && document.activeElement === focusable[focusable.length - 1]) { event.preventDefault(); focusable[0].focus(); }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); previous?.focus(); };
+  }, [pending]);
+  return <div className="fixed inset-0 z-[80] flex items-end bg-black/50 sm:items-center sm:justify-center" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) close(); }}><section ref={dialogRef} role="alertdialog" aria-modal="true" aria-labelledby="decision-dialog-title" className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-card p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:max-w-lg sm:rounded-3xl"><div className="flex items-center justify-between"><h2 id="decision-dialog-title" className="text-2xl font-normal">Confirm policy decision</h2><Button size="icon" variant="ghost" disabled={pending} onClick={close} aria-label="Close decision confirmation"><X className="h-5 w-5"/></Button></div><p className="mt-3 text-sm text-muted-foreground">You are about to record <strong className="capitalize">{action.replaceAll("_", " ")}</strong> for “{item.title}”. This is an auditable backend mutation.</p><Field label={requiresReason ? "Reason (required)" : "Approval note (optional)"}><Textarea value={reason} onChange={(event) => setReason(event.target.value)}/></Field><div className="mt-5 flex gap-2"><Button variant="ghost" disabled={pending} onClick={close}>Cancel</Button><Button className="flex-1" disabled={pending || (requiresReason && reason.trim().length < 3)} onClick={submit}>{pending ? "Recording…" : "Record decision"}</Button></div></section></div>;
+}
 function ProjectCard({ project, canEdit }: { project: DevelopmentProject; canEdit: boolean }) {
   const queryClient = useQueryClient();
   const metrics = useQuery({ queryKey: policyKeys.metrics(project.project_id), queryFn: () => policyApi.metrics(project.project_id) });

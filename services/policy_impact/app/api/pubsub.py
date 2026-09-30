@@ -26,6 +26,7 @@ class PubSubEnvelope(BaseModel):
 class HotspotUpdatedData(BaseModel):
     model_config = ConfigDict(extra="forbid")
     hotspot_id: str
+    request_ids: list[str] = Field(default_factory=list)
     country_code: str
     geography_id: str
     category: str
@@ -59,8 +60,17 @@ def consume_hotspot(payload: dict, request: Request):
 
     ledger = request.app.state.delivery_ledger
     try:
+        # The receipt lives in the same transaction as the recommendation and
+        # outgoing event. It covers a crash before the external ledger completes.
+        if service.repo.get_recommendation_for_inbound_event(event_id):
+            service.repo.dispatch_pending(service.event_bus)
+            return Response(status_code=204)
         claim = ledger.begin(event_id, event_type, data.hotspot_id, event.schema_version) if ledger else "acquired"
         if claim == "duplicate":
+            # An external ledger alone cannot prove the domain transaction was
+            # committed. Fail retryably if its transactional receipt is absent.
+            if not service.repo.get_recommendation_for_inbound_event(event_id):
+                return Response(status_code=503)
             logger.info("pubsub_event_processed", extra={"pubsub_message_id": message_id, "event_id": event_id, "event_type": event_type, "result": "success", "duplicate_delivery": True})
             return Response(status_code=204)
         if claim != "acquired":
@@ -68,7 +78,7 @@ def consume_hotspot(payload: dict, request: Request):
         service.create_recommendation(RecommendationCreateRequest(
             hotspot_id=data.hotspot_id,
             evidence_bundle_id=data.evidence_bundle_id,
-        ))
+        ), inbound_event_id=event_id)
         if ledger:
             ledger.complete(event_id)
     except Exception as exc:
