@@ -265,7 +265,7 @@ All values and descriptions are in `.env.example`:
   `DUPLICATE_SIMILARITY_THRESHOLD`, `RELATED_SIMILARITY_THRESHOLD`, timeout/retry/batch limits.
 - Vertex runtime: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `RUN_VERTEX_INTEGRATION_TESTS`.
 
-Production configuration fails at startup if a selected BigQuery or Pub/Sub dependency lacks required identifiers. Install `.[production]` for Google Cloud SDKs. BigQuery reads use named query parameters and GIS uses `ST_COVERS(..., ST_GEOGPOINT(...))` against versioned boundaries. The transactional operational store remains separate from analytical BigQuery reads. In Cloud Run, enable the BigQuery delivery ledger because SQLite files are ephemeral. Cluster, hotspot, evidence, and outbox records still use SQLite in this release and remain a documented production limitation until a supported durable operational repository is introduced; BigQuery is not treated as a full transactional replacement for Cloud SQL.
+Production configuration fails at startup if a selected BigQuery or Pub/Sub dependency lacks required identifiers. Install `.[production]` for Google Cloud SDKs. BigQuery reads use named query parameters and GIS uses `ST_COVERS(..., ST_GEOGPOINT(...))` against versioned boundaries. The transactional operational store remains separate from analytical BigQuery reads. In Cloud Run, enable the BigQuery delivery ledger because SQLite files are ephemeral. A pooled PostgreSQL repository and compatible migration are available behind `CB_STORAGE_BACKEND=postgresql`; install `.[production,postgres]`. SQLite remains the local/test default, and no Cloud SQL instance has been provisioned. See `docs/cloud-sql-migration.md` at the repository root. BigQuery is not a transactional replacement for Cloud SQL.
 
 Vertex mode also fails startup with an actionable error when project, location, model, dimension, timeout, batch size,
 or thresholds are invalid. Local development authenticates with:
@@ -306,3 +306,25 @@ the two water reports are more similar than the road report. The live integratio
 - SQLite is appropriate for a hackathon/local operational store. A production deployment should move operational idempotency/outbox writes to a managed transactional database; BigQuery is intentionally used for analytical reads, not transactional membership updates.
 - Outbox dispatch retries on later processing or an external scheduled dispatcher; a production worker should continuously drain it and use Pub/Sub dead-letter policies.
 - Authentication/authorization and edge rate limiting are deployment concerns and are not implemented in this isolated service.
+
+## Evidence metadata contract
+
+`decision-metadata-1.0.0.json` is startup-validated typed configuration for canonical
+priority bands and evidence readiness. Hotspot list/detail responses add optional `priority`
+and `evidence_readiness`. Evidence bundles add `priority`, `evidence_groups`, classified
+`sources`, `limitations_structured`, `evidence_readiness`, and `metadata_schema_version` while
+retaining every legacy field.
+
+Ranking scope is country, or country plus an explicitly supplied category filter. Stable
+tie-breaking is Action Score, evidence confidence, request count, calculated timestamp, then
+hotspot ID. Evidence groups are produced from persisted cluster membership; grouped counts
+are unique accepted request IDs and do not claim verification. Readiness is evidence
+completeness guidance only and never changes the Action Score or approves a recommendation.
+
+SQLite migrations preserve existing rows and backfill unknown classifications as
+`unclassified`; no row is promoted to official. BigQuery remains analytical only. Existing
+BigQuery installations require the additive `classification STRING` column before a later
+Data Intelligence rollout. Cloud Run SQLite is ephemeral, so normalized language metadata,
+group membership, evidence bundles, and rankings are not durable across instance replacement
+until the already-documented transactional PostgreSQL path is configured. No Cloud SQL
+resource is provisioned by this change.

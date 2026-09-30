@@ -13,13 +13,17 @@ from packages.contracts.normalization import NormalizedRequestData
 
 
 class NormalizationRecord:
-    def __init__(self, result: NormalizedRequestData, status: str):
+    def __init__(self, request_id: str, result: NormalizedRequestData, status: str):
+        self.request_id = request_id
         self.result = result
         self.status = status  # "normalized" | "needs_review" | "failed"
         self.attempts = 1
         self.created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         self.updated_at = self.created_at
         self.history: List[Dict[str, Any]] = []
+        self.reviewed_at: Optional[str] = None
+        self.reviewed_by: Optional[str] = None
+        self.reviewer_role: Optional[str] = None
 
     def record_attempt(self, result: NormalizedRequestData, status: str):
         self.history.append(
@@ -33,6 +37,25 @@ class NormalizationRecord:
         self.status = status
         self.attempts += 1
         self.updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    def record_approval(self, result: NormalizedRequestData, reviewer_id: str, reviewer_role: str):
+        reviewed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        self.history.append(
+            {
+                "result": self.result.model_dump(),
+                "status": self.status,
+                "recorded_at": self.updated_at,
+                "decision": "approved",
+                "reviewer_id": reviewer_id,
+                "reviewer_role": reviewer_role,
+            }
+        )
+        self.result = result
+        self.status = "normalized"
+        self.reviewed_at = reviewed_at
+        self.reviewed_by = reviewer_id
+        self.reviewer_role = reviewer_role
+        self.updated_at = reviewed_at
 
 
 class NormalizationRepository:
@@ -50,7 +73,7 @@ class NormalizationRepository:
         if existing:
             existing.record_attempt(result, status)
             return existing
-        record = NormalizationRecord(result, status)
+        record = NormalizationRecord(request_id, result, status)
         self._records[request_id] = record
         return record
 

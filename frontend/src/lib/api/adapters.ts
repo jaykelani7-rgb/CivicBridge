@@ -2,7 +2,7 @@ import type { CitizenFormInput, CitizenStatus, CreateCitizenRequest, EvidenceBun
 
 export function adaptCitizenRequest(input: CitizenFormInput): CreateCitizenRequest {
   if (!input.consentAccepted) throw new Error("Consent is required before submission.");
-  return { channel: input.channel, country_code: input.country_code, language_hint: input.language_hint, location: input.location, text: input.text, consent: { accepted: true, version: "2026-08-01" } };
+  return { channel: input.channel, country_code: input.country_code, language_hint: input.language_hint, location: input.location, administrative_area: input.administrative_area, text: input.text, consent: { accepted: true, version: "2026-08-01" } };
 }
 
 export function adaptCitizenStatus(status: CitizenStatus): CitizenStatus {
@@ -34,6 +34,10 @@ export function adaptHotspot(item: HotspotDto): HotspotViewModel {
     calculatedAt: item.calculated_at,
     evidenceBundleId: item.evidence_bundle_id ?? undefined,
     warnings,
+    geography: item.geography,
+    provenance: item.provenance,
+    priority: item.priority,
+    evidenceReadiness: item.evidence_readiness,
   };
 }
 
@@ -45,7 +49,9 @@ export function adaptHotspotPage(input: { items: HotspotDto[]; pagination: { pag
 }
 
 export function evidenceUsesDemoData(bundle: EvidenceBundleDto): boolean {
-  return bundle.data_sources.some((source) => source.synthetic === true || source.synthetic === 1);
+  return [...bundle.data_sources, ...(bundle.sources ?? [])].some((source) =>
+    source.synthetic === true || source.synthetic === 1 || source.classification === "synthetic_demo"
+  );
 }
 
 export function adaptRecommendation(item: Recommendation): RecommendationViewModel {

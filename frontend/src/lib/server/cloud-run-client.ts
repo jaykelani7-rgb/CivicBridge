@@ -4,7 +4,7 @@ import { GoogleAuth } from "google-auth-library";
 import { ApiError } from "@/lib/api/errors";
 import { serverEnv } from "./env";
 
-type ServiceName = "citizen" | "intelligence" | "policy";
+type ServiceName = "citizen" | "normalization" | "intelligence" | "policy";
 type CloudRunRequest = {
   service: ServiceName;
   path: string;
@@ -19,7 +19,7 @@ const googleAuth = new GoogleAuth();
 
 function baseUrl(service: ServiceName): string {
   const env = serverEnv();
-  return service === "citizen" ? env.CITIZEN_CHANNELS_URL : service === "intelligence" ? env.DATA_INTELLIGENCE_URL : env.POLICY_IMPACT_URL;
+  return service === "citizen" ? env.CITIZEN_CHANNELS_URL : service === "normalization" ? env.AI_NORMALIZATION_URL : service === "intelligence" ? env.DATA_INTELLIGENCE_URL : env.POLICY_IMPACT_URL;
 }
 
 export function shouldAttachIdToken(target: string, mode = serverEnv().CLOUD_RUN_AUTH_MODE): boolean {

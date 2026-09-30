@@ -16,7 +16,7 @@ export const citizenApi = {
     const value = await apiRequest(`/api/citizen/requests/${encodeURIComponent(requestId)}/status`, citizenStatusSchema, { signal });
     return adaptCitizenStatus(value);
   },
-  confirm(requestId: string, location: ApproximateLocation, notes?: string) {
+  confirm(requestId: string, location?: ApproximateLocation, notes?: string) {
     return apiRequest(`/api/citizen/requests/${encodeURIComponent(requestId)}/confirmation`, confirmationSchema, { method: "PATCH", body: JSON.stringify({ location, notes }) });
   },
   correct(requestId: string, input: { reason: string; suggested_category?: string; notes?: string }) {

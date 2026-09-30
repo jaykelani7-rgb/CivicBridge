@@ -29,7 +29,7 @@ export function SectionShell({
       id={id}
       aria-labelledby={id ? `${id}-title` : undefined}
       className={cn(
-        "rounded-[28px] border border-border/80 bg-card/90 p-6 shadow-sm backdrop-blur-sm sm:p-8",
+        "border-t border-border py-8",
         className,
       )}
     >
@@ -45,7 +45,7 @@ export function SectionShell({
               {eyebrow}
             </p>
           ) : null}
-          <h2 id={id ? `${id}-title` : undefined} className="font-heading text-3xl font-black text-foreground sm:text-4xl">
+          <h2 id={id ? `${id}-title` : undefined} className="font-heading text-3xl font-normal text-foreground sm:text-4xl">
             {title}
           </h2>
           {description ? (

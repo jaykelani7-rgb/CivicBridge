@@ -16,6 +16,7 @@ from packages.contracts.normalization import NormalizedRequestData
 from services.ai_normalization.api.errors import NormalizationAPIError
 from services.ai_normalization.pipeline.normalization_service import (
     NormalizationNeverRunError,
+    NormalizationNotPendingReviewError,
     RequestNotFoundError,
 )
 
@@ -44,6 +45,23 @@ class NormalizationResponse(BaseModel):
     attempts: int
     updated_at: str
     result: NormalizedRequestData
+
+
+class ReviewQueueItem(BaseModel):
+    request_id: str
+    category: str
+    urgency: str
+    confidence: float
+    review_reason: Optional[str] = None
+    public_summary: str
+    pii_flags: list[str]
+    attempts: int
+    updated_at: str
+
+
+class ApproveReviewBody(BaseModel):
+    reviewer_id: str = Field(..., min_length=1, max_length=256)
+    reviewer_role: str = Field(..., pattern="^(analyst|policymaker|admin)$")
 
 
 class PolicyBriefDraftRequest(BaseModel):
@@ -129,11 +147,16 @@ def consume_citizen_event(payload: dict, request: Request):
             return Response(status_code=204)
         if claim != "acquired":
             return Response(status_code=503)
-        location_hint = (
-            validated_data.location.admin_hint
-            if event.event_type == "request.created.v1"
-            else validated_data.location_confirmed.admin_hint
-        )
+        if event.event_type == "request.created.v1":
+            location_hint = (
+                validated_data.location.admin_hint if validated_data.location else None
+            ) or validated_data.administrative_area
+        else:
+            location_hint = (
+                validated_data.location_confirmed.admin_hint
+                if validated_data.location_confirmed
+                else None
+            ) or validated_data.administrative_area
         request.app.state.service.normalize_request(
             request_id,
             force=False,
@@ -176,6 +199,68 @@ def create_normalization(
     response.headers["X-Trace-Id"] = current_trace_id
     response.status_code = status.HTTP_201_CREATED if was_new else status.HTTP_200_OK
     return _record_to_response(body.request_id, record)
+
+
+@router.get("/internal/v1/review-queue", response_model=list[ReviewQueueItem])
+def list_review_queue(request: Request):
+    """Return a bounded, PII-masked analyst queue; never raw citizen content."""
+    records = sorted(
+        request.app.state.repository.list_needs_review(),
+        key=lambda item: item.updated_at,
+        reverse=True,
+    )
+    return [
+        ReviewQueueItem(
+            request_id=record.request_id,
+            category=record.result.category,
+            urgency=record.result.urgency,
+            confidence=record.result.confidence,
+            review_reason=record.result.review_reason,
+            public_summary=record.result.summary,
+            pii_flags=record.result.pii_flags,
+            attempts=record.attempts,
+            updated_at=record.updated_at,
+        )
+        for record in records[:100]
+    ]
+
+
+@router.post(
+    "/internal/v1/review-queue/{request_id}/approve",
+    response_model=NormalizationResponse,
+)
+def approve_review(
+    request_id: str,
+    body: ApproveReviewBody,
+    request: Request,
+    response: Response,
+    trace_id: Optional[str] = Header(None, alias="X-Trace-Id"),
+):
+    """Record an explicit staff decision, then release the normalized event."""
+    current_trace_id = trace_id or str(uuid.uuid4())
+    try:
+        record = request.app.state.service.approve_review(
+            request_id,
+            reviewer_id=body.reviewer_id,
+            reviewer_role=body.reviewer_role,
+            trace_id=current_trace_id,
+        )
+    except NormalizationNeverRunError:
+        _error(
+            "NORMALIZATION_NOT_FOUND",
+            f"No normalization result exists for request {request_id}.",
+            status.HTTP_404_NOT_FOUND,
+            current_trace_id,
+        )
+    except NormalizationNotPendingReviewError:
+        _error(
+            "NORMALIZATION_NOT_PENDING_REVIEW",
+            f"Request {request_id} is not awaiting human normalization review.",
+            status.HTTP_409_CONFLICT,
+            current_trace_id,
+        )
+    response.headers["X-Trace-Id"] = current_trace_id
+    return _record_to_response(request_id, record)
 
 
 @router.get("/internal/v1/normalizations/{request_id}", response_model=NormalizationResponse)

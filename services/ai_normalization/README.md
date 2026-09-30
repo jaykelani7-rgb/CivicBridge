@@ -207,3 +207,12 @@ subfolder instead of this repo's real top-level `services` package --
 `ModuleNotFoundError: No module named 'services.ai_normalization'` even
 though the module clearly exists. Renaming to `pipeline/` removes the name
 collision entirely rather than relying on import-order luck.
+### Additive evidence metadata
+
+`request.normalized.v1` may now include `working_language`,
+`anonymized_original_summary`, and `translation` metadata. These fields are optional and the
+event remains version 1. The current pipeline supplies working language and deterministic
+translation provider/status. It deliberately leaves `anonymized_original_summary` null
+because the extractor summarizes the working translation; it does not relabel a full masked
+transcript as an original-language summary. Existing consumers and stored normalizations
+without these fields remain valid.

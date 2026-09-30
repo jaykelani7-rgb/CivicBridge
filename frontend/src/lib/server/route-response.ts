@@ -14,3 +14,9 @@ export function routeError(error: unknown) {
   console.error("bff_request_failed", { error_type: error instanceof Error ? error.name : "UnknownError" });
   return NextResponse.json({ error: { code: "BFF_INTERNAL_ERROR", message: "The request could not be completed safely.", retryable: true, details: [] } }, { status: 500 });
 }
+
+export function publicRouteError(error: unknown) {
+  if (error instanceof ApiError) return NextResponse.json({ error: { code: error.code, message: error.message, retryable: error.retryable, details: [] } }, { status: error.status, headers: error.traceId ? { "X-Trace-Id": error.traceId } : undefined });
+  console.error("public_bff_request_failed", { error_type: error instanceof Error ? error.name : "UnknownError" });
+  return NextResponse.json({ error: { code: "PUBLIC_DATA_UNAVAILABLE", message: "Public aggregate data is temporarily unavailable.", retryable: true, details: [] } }, { status: 500 });
+}

@@ -20,6 +20,9 @@ class Settings:
     storage_backend: str = "sqlite"
     analytical_backend: str = "local"
     database_path: str = "./data/intelligence.db"
+    database_url: Optional[str] = None
+    database_pool_min_size: int = 1
+    database_pool_max_size: int = 10
     fixture_dir: str = "./fixtures"
     geography_provider: str = "local"
     country_packs: tuple[str, ...] = ("IN", "BR", "ZA")
@@ -56,18 +59,22 @@ class Settings:
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
         source = os.environ if env is None else env
-        runtime_mode = _env(source, "CB_MODE", "local").lower()
+        environment = _env(source, "CB_ENV", "local")
+        runtime_mode = _env(source, "CB_MODE", "google" if environment == "production" else "local").lower()
         legacy_storage = _env(source, "CB_STORAGE_BACKEND", "sqlite").lower()
         default_analytical = "bigquery" if runtime_mode == "google" or legacy_storage == "bigquery" else "local"
         default_geography = "bigquery" if runtime_mode == "google" else "local"
         settings = cls(
             runtime_mode=runtime_mode,
-            environment=_env(source, "CB_ENV", "local"),
+            environment=environment,
             service_port=int(_env(source, "CB_SERVICE_PORT", "8080")),
             log_level=_env(source, "CB_LOG_LEVEL", "INFO").upper(),
             storage_backend="sqlite" if legacy_storage == "bigquery" else legacy_storage,
             analytical_backend=_env(source, "CB_ANALYTICAL_BACKEND", default_analytical).lower(),
             database_path=_env(source, "CB_DATABASE_PATH", "./data/intelligence.db"),
+            database_url=source.get("CB_DATABASE_URL") or None,
+            database_pool_min_size=int(_env(source, "CB_DATABASE_POOL_MIN_SIZE", "1")),
+            database_pool_max_size=int(_env(source, "CB_DATABASE_POOL_MAX_SIZE", "10")),
             fixture_dir=_env(source, "CB_FIXTURE_DIR", "./fixtures"),
             geography_provider=_env(source, "CB_GEOGRAPHY_PROVIDER", default_geography).lower(),
             country_packs=tuple(x.strip().upper() for x in _env(source, "CB_COUNTRY_PACKS", "IN,BR,ZA").split(",") if x.strip()),
@@ -109,8 +116,12 @@ class Settings:
             raise ValueError("CB_MODE must be local or google")
         if self.environment not in {"local", "test", "production"}:
             raise ValueError("CB_ENV must be local, test, or production")
-        if self.storage_backend != "sqlite":
-            raise ValueError("CB_STORAGE_BACKEND must remain sqlite for this release")
+        if self.storage_backend not in {"sqlite", "postgresql"}:
+            raise ValueError("CB_STORAGE_BACKEND must be sqlite or postgresql")
+        if self.storage_backend == "postgresql" and not self.database_url:
+            raise ValueError("CB_DATABASE_URL is required when CB_STORAGE_BACKEND=postgresql")
+        if not 1 <= self.database_pool_min_size <= self.database_pool_max_size <= 50:
+            raise ValueError("database pool sizes must satisfy 1 <= min <= max <= 50")
         if self.analytical_backend not in {"local", "bigquery"}:
             raise ValueError("CB_ANALYTICAL_BACKEND must be local or bigquery")
         if self.geography_provider not in {"local", "bigquery"}:

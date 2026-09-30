@@ -127,6 +127,20 @@ The services remain private. An owner must grant those per-service bindings, con
 
 `NEXT_PUBLIC_DEMO_MODE=false` is the default. Failed API requests never fall back to mock content. If demo mode is explicitly enabled, visible “Demo data” labels appear. Evidence bundles also inspect backend source provenance and label synthetic fixtures independently of this flag.
 
+## Evidence metadata compatibility
+
+The Evidence & Scoring workspace accepts the additive Data Intelligence fields
+`priority`, `evidence_groups`, `limitations_structured`, `evidence_readiness`, and
+classified `sources`. Zod treats them as optional so an older backend still renders the
+legacy evidence bundle. Missing rank displays “Priority classification unavailable,”
+missing grouping keeps summaries separate, and missing readiness displays “Evidence
+readiness not assessed”; the browser never invents canonical values.
+
+The internal BFF may pass authorized staff metadata, while the public projection strips
+reason codes, reviewer actions, internal identifiers, and technical provenance. It may
+expose only public-safe rank, total, band, scope, and timestamp. The workspace continues to
+use the established light palette (`#092634`, `#004E72`, `#FF6E42`, `#F9F9F9`).
+
 ## Verification
 
 ```bash
@@ -148,3 +162,8 @@ E2E tests verify public citizen submission behavior and the unauthenticated staf
 5. Keep every backend service private and verify citizen submission plus staff-role denial/allow paths.
 
 See [`INTEGRATION_GAPS.md`](../INTEGRATION_GAPS.md) for capabilities that require backend or owner configuration.
+
+For a later manual rollout of this additive contract, deploy AI Normalization first only
+if its optional event fields are enabled, then Data Intelligence, then the frontend. Policy
++ Impact requires no deployment unless it elects to consume the optional metadata. This
+repository change does not deploy or modify traffic.

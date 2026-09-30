@@ -1,0 +1,7 @@
+.fixture-banner { position: fixed; inset-inline: 0; bottom: 0; z-index: 100; padding: 10px 16px; background: #986122; color: white; font-size: .75rem; line-height: 1.6; text-align: center; }
+.fixture-toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; max-width: 1280px; margin: auto; }
+.fixture-content { max-width: 1280px; margin: auto; padding: 20px 16px 100px; }
+.fixture-message { padding: 16px; border: 1px solid var(--border); }
+
+#root { padding-bottom: 80px; }
+#root [aria-modal="true"] { padding-bottom: 10rem; }

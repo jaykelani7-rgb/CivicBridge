@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Any, Generic, Literal, Optional, TypeVar
 from uuid import UUID
 
@@ -11,6 +12,15 @@ ALLOWED_CATEGORIES = {
     "transport", "health", "education", "waste", "housing", "environment", "other",
 }
 SUPPORTED_COUNTRIES = {"IN", "BR", "ZA"}
+logger = logging.getLogger("civicbridge.data_intelligence")
+ALLOWED_EVIDENCE_TYPES = {"text", "voice", "image", "messaging", "repeat_report", "document", "unknown"}
+
+
+class TranslationMetadata(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    performed: bool
+    provider: Optional[str] = None
+    confidence: Optional[float] = Field(default=None, ge=0, le=1)
 
 
 class Coordinates(BaseModel):
@@ -26,6 +36,9 @@ class NormalizedRequest(BaseModel):
     request_id: UUID
     country_code: str
     original_language: str
+    working_language: str = "en"
+    anonymized_original_summary: Optional[str] = Field(default=None, max_length=500)
+    translation: Optional[TranslationMetadata] = None
     transcript_original: Optional[str] = None
     translation_working: str
     category: str
@@ -85,6 +98,15 @@ class NormalizedRequest(BaseModel):
     @classmethod
     def usable_mentions(cls, value: list[str]) -> list[str]:
         return [x.strip() for x in value if x.strip()]
+
+    @field_validator("evidence_types")
+    @classmethod
+    def normalize_evidence_types(cls, value: list[str]) -> list[str]:
+        aliases = {"photo": "image", "service_outage": "unknown"}
+        normalized = {aliases.get(str(item), str(item)) for item in value}
+        if normalized - ALLOWED_EVIDENCE_TYPES:
+            logger.warning("normalized_event_enum_fallback", extra={"invalid_enum": "evidence_type"})
+        return sorted(item if item in ALLOWED_EVIDENCE_TYPES else "unknown" for item in normalized) or ["unknown"]
 
 
 T = TypeVar("T")

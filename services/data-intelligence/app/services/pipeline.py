@@ -16,6 +16,7 @@ from app.schemas.events import (
     NormalizedRequest,
 )
 from app.services.duplicates import DuplicateDetector
+from app.services.decision_metadata import DecisionMetadataService
 from app.services.evidence import build_evidence_bundle
 from app.services.outbox import OutboxDispatcher
 from app.services.scoring import ScoringEngine
@@ -30,7 +31,8 @@ def utc_now() -> str:
 class IntelligencePipeline:
     def __init__(self, repository: Any, geography_provider: Any, duplicate_detector: DuplicateDetector,
                  scoring: ScoringEngine, outbox: OutboxDispatcher, metrics: Metrics,
-                 public_data_repository: Optional[Any] = None) -> None:
+                 public_data_repository: Optional[Any] = None,
+                 decision_metadata: Optional[DecisionMetadataService] = None) -> None:
         self.repository = repository
         self.geography_provider = geography_provider
         self.duplicate_detector = duplicate_detector
@@ -38,6 +40,7 @@ class IntelligencePipeline:
         self.outbox = outbox
         self.metrics = metrics
         self.public_data_repository = public_data_repository or repository
+        self.decision_metadata = decision_metadata
 
     @contextmanager
     def stage(self, name: str, context: dict[str, Any]) -> Iterator[None]:
@@ -60,6 +63,8 @@ class IntelligencePipeline:
         self.metrics.increment("events_received")
         if envelope.event_type != "request.normalized.v1":
             raise DomainError("NORMALIZED_REQUEST_INVALID", "Expected request.normalized.v1 event.", details=[{"field":"event_type","reason":"unsupported event"}])
+        if request.translation is None and request.anonymized_original_summary is None:
+            logger.info("normalized_event_metadata_fallback", extra={**context, "event_version": envelope.schema_version})
 
         existing = self.repository.get_processed_event(event_id)
         if existing and existing["status"] == "completed":
@@ -115,6 +120,18 @@ class IntelligencePipeline:
                         self.metrics.increment("manual_review_candidates")
 
                 with self.stage("assign_cluster",context):
+                    self.repository.save_normalized_request({
+                        "request_id":str(request.request_id),"event_id":event_id,"country_code":request.country_code,
+                        "category":request.category,"subcategory":request.subcategory,"summary":request.summary,
+                        "requested_outcome":request.requested_outcome,"urgency":request.urgency,"confidence":request.confidence,
+                        "model":request.model,"prompt_version":request.prompt_version,"schema_version":request.schema_version,
+                        "original_language":request.original_language,"working_language":request.working_language,
+                        "anonymized_original_summary":request.anonymized_original_summary,
+                        "translation_performed":bool(request.translation and request.translation.performed),
+                        "translation_provider":request.translation.provider if request.translation else None,
+                        "evidence_types":request.evidence_types,"pii_flags":request.pii_flags,
+                        "occurred_at":self._iso(envelope.occurred_at),"created_at":utc_now(),
+                    })
                     high = next((x for x in candidates if x.suggested_action == "auto_attach"),None)
                     if high and geography.confidence >= 0.75:
                         cluster_id, assignment = high.candidate_cluster_id, "existing_cluster"
@@ -130,7 +147,8 @@ class IntelligencePipeline:
                     self.repository.add_cluster_member({"request_id":str(request.request_id),"cluster_id":cluster_id,"event_id":event_id,
                         "summary":request.summary,"requested_outcome":request.requested_outcome,"urgency":request.urgency,
                         "request_confidence":request.confidence,"location_confidence":geography.confidence,
-                        "occurred_at":self._iso(envelope.occurred_at),"evidence_refs":[event_id]})
+                        "occurred_at":self._iso(envelope.occurred_at),"evidence_refs":[event_id],
+                        "group_relationship":"probable_duplicate" if assignment == "existing_cluster" else "distinct_theme"})
                     context["cluster_id"] = cluster_id
 
                 result = self._calculate_and_store(cluster_id,geography,trace_id,reason="normalized_request_processed",idempotency_key=None)
@@ -222,8 +240,25 @@ class IntelligencePipeline:
             self.repository.save_score_components(hotspot_id,version,component_rows)
         with self.stage("build_evidence_bundle",context):
             geo_public = {**geography.__dict__}
+            metadata: dict[str, Any] = {}
+            if self.decision_metadata:
+                ranked = self.repository.list_hotspots_for_ranking(cluster["country_code"])
+                priority_hotspot = {**hotspot, "score_components": component_rows}
+                sources = self.decision_metadata.sources(enrichment, component_rows, hotspot_id=hotspot_id)
+                limitations = self.decision_metadata.limitations(
+                    components=component_rows, sources=sources, geography=geo_public, warnings=score.warnings, created_at=now
+                )
+                metadata = {
+                    "priority": self.decision_metadata.priority(priority_hotspot, ranked),
+                    "evidence_groups": self.decision_metadata.evidence_groups(cluster_id, members, hotspot_id=hotspot_id),
+                    "sources": sources,
+                    "limitations_structured": limitations,
+                    "evidence_readiness": self.decision_metadata.readiness(limitations, assessed_at=now),
+                    "metadata_schema_version": self.decision_metadata.config.version,
+                }
             bundle_id,digest,bundle = build_evidence_bundle(hotspot=hotspot,geography=geo_public,members=members,
-                components=component_rows,enrichment=enrichment,bundle_version=version,created_at=now,warnings=score.warnings)
+                components=component_rows,enrichment=enrichment,bundle_version=version,created_at=now,warnings=score.warnings,
+                metadata=metadata)
             self.repository.save_evidence_bundle(bundle_id,hotspot_id,version,bundle,digest,now)
             hotspot["evidence_bundle_id"] = bundle_id
             self.repository.set_hotspot_bundle(hotspot_id,bundle_id)

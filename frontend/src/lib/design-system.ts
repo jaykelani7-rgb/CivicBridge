@@ -1,13 +1,14 @@
 export const designTokens = {
   colors: {
-    terracotta: "#D1603D",
-    neem: "#6B8E23",
-    indigo: "#3F51B5",
-    offWhite: "#F5F5F5",
-    charcoal: "#333333",
-    tomato: "#E53935",
-    sky: "#039BE5",
-    harvest: "#E6A157",
+    terracotta: "#C66A49",
+    forest: "#24483F",
+    neem: "#466357",
+    indigo: "#24483F",
+    offWhite: "#FAF7EE",
+    charcoal: "#242923",
+    tomato: "#B23C32",
+    sky: "#276579",
+    harvest: "#986122",
     white: "#FFFFFF",
   },
   typography: {
@@ -17,7 +18,7 @@ export const designTokens = {
       lineHeight: "1.6",
     },
     heading: {
-      fontFamily: "var(--font-lato), sans-serif",
+      fontFamily: "var(--font-lato), serif",
       scale: ["24px", "32px", "40px", "56px"],
     },
   },

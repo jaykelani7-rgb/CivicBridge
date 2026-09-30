@@ -5,6 +5,7 @@ import { clearedSessionCookieOptions, sessionCookieOptions } from "./session-coo
 describe("staff session cookie policy", () => {
   beforeEach(() => {
     vi.stubEnv("CITIZEN_CHANNELS_URL", "http://127.0.0.1:8000");
+    vi.stubEnv("AI_NORMALIZATION_URL", "http://127.0.0.1:8001");
     vi.stubEnv("DATA_INTELLIGENCE_URL", "http://127.0.0.1:8002");
     vi.stubEnv("POLICY_IMPACT_URL", "http://127.0.0.1:8003");
   });

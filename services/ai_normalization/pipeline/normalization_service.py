@@ -17,7 +17,7 @@ import logging
 from typing import Optional, Tuple
 
 from packages.contracts.envelope import EventEnvelope
-from packages.contracts.normalization import NormalizedRequestData
+from packages.contracts.normalization import NormalizedRequestData, TranslationMetadata
 from packages.event_bus.bus import EventBus
 
 from services.ai_normalization.clients.citizen_channels_client import CitizenChannelsClient
@@ -38,6 +38,10 @@ class RequestNotFoundError(Exception):
 
 class NormalizationNeverRunError(Exception):
     """Raised by retry() when a request has never been normalized before."""
+
+
+class NormalizationNotPendingReviewError(Exception):
+    """Raised when a human decision targets a record that is not awaiting review."""
 
 
 class NormalizationService:
@@ -138,6 +142,16 @@ class NormalizationService:
             request_id=request_id,
             country_code=country_code,
             original_language=language_hint,
+            working_language="en",
+            # The current extractor summarizes the working translation, not the
+            # original language. Leave this absent instead of mislabelling text.
+            anonymized_original_summary=None,
+            translation=TranslationMetadata(
+                performed=translation_status == "ok" and language_hint.split("-")[0].lower() != "en",
+                provider=("mock-translation" if self.settings.USE_MOCK_SERVICES else "google-cloud-translation")
+                if translation_status == "ok" else None,
+                confidence=None,
+            ),
             transcript_original=masked_original,
             translation_working=masked_translation,
             category=cleaned["category"],
@@ -187,4 +201,37 @@ class NormalizationService:
         if not self.repo.exists(request_id):
             raise NormalizationNeverRunError(request_id)
         record, _ = self.normalize_request(request_id, force=True)
+        return record
+
+    def approve_review(
+        self,
+        request_id: str,
+        reviewer_id: str,
+        reviewer_role: str,
+        trace_id: Optional[str] = None,
+    ) -> NormalizationRecord:
+        record = self.repo.get(request_id)
+        if not record:
+            raise NormalizationNeverRunError(request_id)
+        if record.status == "normalized" and record.reviewed_at:
+            return record
+        if record.status != "needs_review":
+            raise NormalizationNotPendingReviewError(request_id)
+
+        approved_result = record.result.model_copy(
+            update={"needs_human_review": False, "review_reason": None}
+        )
+        event = EventEnvelope(
+            event_type="request.normalized.v1",
+            producer="ai-normalization",
+            data=approved_result.model_dump(),
+            **({"trace_id": trace_id} if trace_id else {}),
+        )
+        self.event_bus.publish(event)
+        record.record_approval(approved_result, reviewer_id, reviewer_role)
+        logger.info(
+            "Human review approved request %s (reviewer_role=%s)",
+            request_id,
+            reviewer_role,
+        )
         return record

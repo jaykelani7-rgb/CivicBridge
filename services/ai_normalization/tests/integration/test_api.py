@@ -140,6 +140,65 @@ def test_needs_review_request_publishes_needs_review_event(app_bundle):
     assert "request.needs_review.v1" in published_types
     assert "request.normalized.v1" not in published_types
 
+    queue = client.get("/internal/v1/review-queue")
+    assert queue.status_code == 200
+    assert queue.json() == [{
+        "request_id": "req-injection",
+        "category": body["result"]["category"],
+        "urgency": body["result"]["urgency"],
+        "confidence": body["result"]["confidence"],
+        "review_reason": body["result"]["review_reason"],
+        "public_summary": body["result"]["summary"],
+        "pii_flags": body["result"]["pii_flags"],
+        "attempts": 1,
+        "updated_at": body["updated_at"],
+    }]
+
+
+def test_human_review_approval_is_explicit_audited_and_idempotent(app_bundle):
+    app, bus, repo, _ = app_bundle
+    client = TestClient(app)
+    client.post("/internal/v1/normalizations", json={"request_id": "req-001"})
+
+    approved = client.post(
+        "/internal/v1/review-queue/req-001/approve",
+        json={"reviewer_id": "staff-uid-1", "reviewer_role": "analyst"},
+        headers={"X-Trace-Id": "review-trace-1"},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "normalized"
+    assert approved.json()["result"]["needs_human_review"] is False
+    assert approved.json()["result"]["review_reason"] is None
+    assert client.get("/internal/v1/review-queue").json() == []
+    record = repo.get("req-001")
+    assert record.reviewed_by == "staff-uid-1"
+    assert record.reviewer_role == "analyst"
+    assert record.reviewed_at
+    normalized_events = [e for e in bus.published_events if e.event_type == "request.normalized.v1"]
+    assert len(normalized_events) == 1
+    assert normalized_events[0].trace_id == "review-trace-1"
+
+    repeated = client.post(
+        "/internal/v1/review-queue/req-001/approve",
+        json={"reviewer_id": "staff-uid-1", "reviewer_role": "analyst"},
+    )
+    assert repeated.status_code == 200
+    assert len([e for e in bus.published_events if e.event_type == "request.normalized.v1"]) == 1
+
+
+def test_human_review_approval_rejects_missing_or_invalid_state(client):
+    missing = client.post(
+        "/internal/v1/review-queue/never-normalized/approve",
+        json={"reviewer_id": "staff-uid-1", "reviewer_role": "analyst"},
+    )
+    assert missing.status_code == 404
+
+    invalid_role = client.post(
+        "/internal/v1/review-queue/req-001/approve",
+        json={"reviewer_id": "staff-uid-1", "reviewer_role": "citizen"},
+    )
+    assert invalid_role.status_code == 422
+
 
 def test_event_driven_auto_normalization(app_bundle):
     """

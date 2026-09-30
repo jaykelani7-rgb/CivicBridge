@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from packages.cloud_runtime import BigQueryDeliveryLedger, PubSubEventBus
 from packages.event_bus import configure_event_bus
 from services.policy_impact.app.config import settings
+from services.policy_impact.app.database import get_repository
+from services.policy_impact.app.demo_baseline import restore_demo_recommendations
 
 if settings.EVENT_BUS == "pubsub":
     configure_event_bus(PubSubEventBus(settings.PUBSUB_PROJECT, {
@@ -34,6 +36,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+
+if settings.ENVIRONMENT == "production":
+    restore_demo_recommendations(get_repository())
 
 app = FastAPI(
     title=settings.APP_NAME,
