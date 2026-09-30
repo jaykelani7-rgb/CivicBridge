@@ -35,13 +35,17 @@ class ProjectCreateRequest(BaseModel):
     assigned_department: Optional[str] = Field(None, description="Department responsible for execution")
 
 
+class ProjectStatusUpdateRequest(BaseModel):
+    status: ProjectStatus
+
+
 class Project(BaseModel):
     project_id: str = Field(default_factory=lambda: str(uuid4()))
     recommendation_id: str
     hotspot_id: str
-    country_code: str = "IN"
+    country_code: str = "unknown"
     title: str
-    sector: str = "drainage"
+    sector: str = "unassessed"
     status: ProjectStatus = ProjectStatus.CANDIDATE
     assigned_department: Optional[str] = None
     milestones: List[Milestone] = Field(default_factory=list)

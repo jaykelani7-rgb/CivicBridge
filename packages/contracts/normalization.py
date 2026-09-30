@@ -14,6 +14,13 @@ class NormalizedRequestData(BaseModel):
     working_language: str = "en"
     anonymized_original_summary: Optional[str] = None
     translation: Optional[TranslationMetadata] = None
+    processing_mode: str = "unknown"
+    speech_provider: Optional[str] = None
+    speech_model: Optional[str] = None
+    speech_status: str = "not_recorded"
+    translation_status: str = "not_recorded"
+    extraction_status: str = "not_recorded"
+    fallback_used: bool = False
     transcript_original: str
     translation_working: str
     category: str = Field(..., description="water, sanitation, roads, drainage, electricity, connectivity, transport, health, education, waste, housing, environment, other")

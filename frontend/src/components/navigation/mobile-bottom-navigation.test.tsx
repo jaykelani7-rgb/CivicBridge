@@ -23,9 +23,9 @@ describe("mobile navigation configuration", () => {
 
   it.each([
     ["analyst", ["Overview","Hotspots","Review","Evidence","More"]],
-    ["policymaker", ["Overview","Hotspots","Review","Policy","More"]],
+    ["policymaker", ["Overview","Review","Policy","Projects","Impact"]],
     ["csr_partner", ["Overview","Projects","Impact","Explore","More"]],
-    ["admin", ["Overview","Hotspots","Review","Policy","More"]],
+    ["admin", ["Overview","Review","Policy","Projects","Impact"]],
   ] as const)("maps verified %s role destinations", (role, labels) => {
     expect(navigationForRole(role).map((item) => item.label)).toEqual(labels);
     expect(staffNavigation[role]).toBe(navigationForRole(role));

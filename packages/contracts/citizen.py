@@ -75,10 +75,18 @@ class CitizenStatusResponse(BaseModel):
         description="submitted, normalizing, under_review, hotspot_aggregated, recommended, policy_approved, project_active"
     )
     public_summary: Optional[str] = None
+    normalized_summary: Optional[str] = None
+    processing_mode: Optional[str] = None
+    report_confirmed: bool = False
     category: Optional[str] = None
     hotspot_score: Optional[float] = None
     project_title: Optional[str] = None
     project_status: Optional[str] = None
+    hotspot_id: Optional[str] = None
+    recommendation_id: Optional[str] = None
+    project_id: Optional[str] = None
+    outcome_status: Optional[str] = None
+    measurement_source_type: Optional[str] = None
     pii_masked: bool = True
 
 class ContentRetrievalResponse(BaseModel):
@@ -89,4 +97,5 @@ class ContentRetrievalResponse(BaseModel):
     text: Optional[str] = None
     media_ref: Optional[str] = None
     media_type: Optional[str] = None
+    media: List[Dict[str, Any]] = Field(default_factory=list)
     submitted_at: str

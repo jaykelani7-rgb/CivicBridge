@@ -30,6 +30,7 @@ from .decision import PolicyAction, PolicyDecision, PolicyDecisionCreateRequest
 from .project import (
     Project,
     ProjectCreateRequest,
+    ProjectStatusUpdateRequest,
     ProjectStatus,
     Milestone,
     MilestoneCreateRequest,
@@ -63,6 +64,7 @@ __all__ = [
     "PolicyDecisionCreateRequest",
     "Project",
     "ProjectCreateRequest",
+    "ProjectStatusUpdateRequest",
     "ProjectStatus",
     "Milestone",
     "MilestoneCreateRequest",

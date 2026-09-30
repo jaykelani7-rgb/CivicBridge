@@ -30,8 +30,8 @@ PROMPT_TEMPLATE = (
     "'missing_information' instead of guessing.\n\n"
     "Evidence bundle:\n{bundle_json}\n\n"
     "Return ONLY JSON with keys: title, problem, proposed_intervention, intended_beneficiaries "
-    "(integer), supporting_evidence_ids (array, subset of the bundle's valid_evidence_ids), risks "
-    "(array), missing_information (array), confidence (0.0-1.0)."
+    "(integer or null when unmeasured), supporting_evidence_ids (array, subset of the bundle's valid_evidence_ids), risks "
+    "(array), missing_information (array), confidence (0.0-1.0 or null when unassessed)."
 )
 
 
@@ -52,29 +52,27 @@ class PolicyBriefDraftAdapter:
                 vertexai.init(project=project_id, location=location)
                 self._model = GenerativeModel(model_name)
             except Exception as exc:
-                logger.warning("Failed to initialize Vertex AI Gemini for policy briefs (%s). Falling back to mock.", exc)
-                self.use_mock = True
+                logger.error("Vertex AI policy drafting is unavailable: %s", exc)
 
     @staticmethod
     def _ground(draft: Dict[str, Any], valid_ids: List[str]) -> Dict[str, Any]:
         """Defense-in-depth: strip any cited id the evidence bundle never supplied."""
         cited = draft.get("supporting_evidence_ids") or []
-        grounded = [i for i in cited if i in valid_ids] or valid_ids[:2]
+        grounded = [i for i in cited if i in valid_ids]
         draft["supporting_evidence_ids"] = grounded
         if len(grounded) < len(cited):
             draft.setdefault("missing_information", [])
             draft["missing_information"].append(
                 "Some AI-cited evidence ids were not present in the supplied bundle and were removed."
             )
-            draft["confidence"] = min(float(draft.get("confidence", 0.85)), 0.6)
+            if draft.get("confidence") is not None:
+                draft["confidence"] = min(float(draft["confidence"]), 0.6)
         return draft
 
     def _mock_draft(self, hotspot_id: str, evidence_bundle: Dict[str, Any]) -> Dict[str, Any]:
-        valid_ids = evidence_bundle.get(
-            "valid_evidence_ids", ["src_population_42", "cluster_drainage_42"]
-        )
+        valid_ids = evidence_bundle.get("valid_evidence_ids", [])
         summary = evidence_bundle.get("summary", "Recurring infrastructure demand hotspot.")
-        population = (evidence_bundle.get("demographic_indicators") or {}).get("affected_population", 12400)
+        population = (evidence_bundle.get("demographic_indicators") or {}).get("affected_population")
 
         draft = {
             "title": f"Infrastructure rehabilitation assessment for {hotspot_id[:8]}",
@@ -83,8 +81,10 @@ class PolicyBriefDraftAdapter:
             "intended_beneficiaries": population,
             "supporting_evidence_ids": list(valid_ids),
             "risks": ["Current capacity survey requires sub-surface/field validation."],
-            "missing_information": ["Detailed engineering design and cost estimate"],
-            "confidence": 0.86,
+            "missing_information": ["Detailed engineering design and cost estimate"] + (["Affected population needs assessment"] if population is None else []),
+            "confidence": None,
+            "processing_mode": "mock",
+            "provider": "deterministic-demo",
         }
         return self._ground(draft, valid_ids)
 
@@ -93,6 +93,8 @@ class PolicyBriefDraftAdapter:
 
         if self.use_mock:
             return self._mock_draft(hotspot_id, evidence_bundle)
+        if self._model is None:
+            raise RuntimeError("Live policy drafting provider is unavailable")
 
         prompt = PROMPT_TEMPLATE.format(bundle_json=json.dumps(evidence_bundle, indent=2))
         try:
@@ -101,7 +103,10 @@ class PolicyBriefDraftAdapter:
                 generation_config={"response_mime_type": "application/json"},
             )
             draft = json.loads(response.text)
+            draft["processing_mode"] = "live"
+            draft["provider"] = "google-vertex-ai"
+            draft["model"] = self.model_name
             return self._ground(draft, valid_ids)
         except Exception as exc:
-            logger.error("Gemini policy-brief drafting failed (%s); falling back to mock draft engine.", exc)
-            return self._mock_draft(hotspot_id, evidence_bundle)
+            logger.error("Gemini policy-brief drafting failed (%s).", exc)
+            raise RuntimeError("Live policy drafting failed; human review is required") from exc

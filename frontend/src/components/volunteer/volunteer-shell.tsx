@@ -44,6 +44,8 @@ export function VolunteerShell() {
   const chunks = useRef<Blob[]>([]);
   const recordingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollCount = useRef(0);
+  const submissionKey = useRef<string | null>(null);
+  const uploadedFiles = useRef({ primary: false, supporting: false });
   const [requestId, setRequestId] = useState<string | null>(null);
   const [country, setCountry] = useState<"IN" | "BR" | "ZA">(initialCountry === "BR" || initialCountry === "ZA" ? initialCountry : "IN");
   const [language, setLanguage] = useState("en-IN");
@@ -53,6 +55,7 @@ export function VolunteerShell() {
   const [location, setLocation] = useState<ApproximateLocation | null>(null);
   const [attachment, setAttachment] = useState<File | Blob | null>(null);
   const [attachmentName, setAttachmentName] = useState("");
+  const [supportingAttachment, setSupportingAttachment] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
   const [polling, setPolling] = useState(true);
   const [correction, setCorrection] = useState("");
@@ -98,14 +101,23 @@ export function VolunteerShell() {
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!consent) throw new Error("Consent is required before submission.");
-      if (!text.trim() && !attachment) throw new Error("Add a written report, recording, or evidence file.");
+      if (!text.trim() && !attachment?.type.startsWith("audio/") && !supportingAttachment?.type.startsWith("audio/")) throw new Error("Add a written report or voice recording before submitting.");
       if (!location && !adminHint.trim()) throw new Error("Add an administrative area or choose approximate browser location.");
       setSubmissionPhase("saving");
-      const payload: CreateCitizenRequest = adaptCitizenRequest({ channel: attachment?.type.startsWith("audio/") ? "web_voice" : "web_text", country_code: country, language_hint: language, location: location ? { ...location, admin_hint: adminHint.trim() || undefined } : undefined, administrative_area: adminHint.trim() || undefined, consentAccepted: consent, text: text.trim() || undefined });
-      const receipt = await citizenApi.create(payload, crypto.randomUUID());
-      if (attachment) {
+      const payload: CreateCitizenRequest = adaptCitizenRequest({ channel: attachment?.type.startsWith("audio/") || supportingAttachment?.type.startsWith("audio/") ? "web_voice" : "web_text", country_code: country, language_hint: language, location: location ? { ...location, admin_hint: adminHint.trim() || undefined } : undefined, administrative_area: adminHint.trim() || undefined, consentAccepted: consent, text: text.trim() || undefined });
+      submissionKey.current ??= crypto.randomUUID();
+      const receipt = await citizenApi.create(payload, submissionKey.current);
+      window.localStorage.setItem(trackingKey, receipt.request_id);
+      setRequestId(receipt.request_id);
+      if (attachment && !uploadedFiles.current.primary) {
         setSubmissionPhase("uploading");
         await citizenApi.upload(receipt.request_id, attachment, attachmentName || "citizen-evidence.bin");
+        uploadedFiles.current.primary = true;
+      }
+      if (supportingAttachment && !uploadedFiles.current.supporting) {
+        setSubmissionPhase("uploading");
+        await citizenApi.upload(receipt.request_id, supportingAttachment, supportingAttachment.name);
+        uploadedFiles.current.supporting = true;
       }
       return receipt;
     },
@@ -113,6 +125,7 @@ export function VolunteerShell() {
       setValidationError(null);
       window.localStorage.setItem(trackingKey, receipt.request_id);
       setRequestId(receipt.request_id); setPolling(true); pollCount.current = 0;
+      submissionKey.current = null; uploadedFiles.current = { primary: false, supporting: false };
       await queryClient.invalidateQueries({ queryKey: ["citizen"] });
       toast.success(`Request accepted. Receipt ${receipt.receipt_id}`);
     },
@@ -148,7 +161,7 @@ export function VolunteerShell() {
         if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
         const blob = new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" });
         inputStream.getTracks().forEach((track) => track.stop()); stream.current = null;
-        try { const wav = await convertRecordedAudioToWav(blob); if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl); setAttachment(wav); setAttachmentName("citizen-recording.wav"); setAudioPreviewUrl(URL.createObjectURL(wav)); toast.success("Recording ready for review and upload."); }
+        try { const wav = await convertRecordedAudioToWav(blob); if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl); setAttachment(wav); setAttachmentName("citizen-recording.wav"); uploadedFiles.current.primary = false; setAudioPreviewUrl(URL.createObjectURL(wav)); toast.success("Recording ready for review and upload."); }
         catch { toast.error("This browser could not prepare the recording. Upload a WAV, MP3, M4A, or OGG file instead."); }
         finally { setRecording(false); }
       };
@@ -168,12 +181,14 @@ export function VolunteerShell() {
     if (file.size > 10 * 1024 * 1024) { toast.error("Choose a file smaller than 10 MB."); return; }
     if (!file.type.startsWith("audio/") && !["image/jpeg", "image/png"].includes(file.type)) { toast.error("Use a supported audio, JPG, or PNG file."); return; }
     setAttachment(file); setAttachmentName(file.name);
+    uploadedFiles.current.primary = false;
     if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
     setAudioPreviewUrl(file.type.startsWith("audio/") ? URL.createObjectURL(file) : null);
   }
 
   function deleteAttachment() {
     setAttachment(null); setAttachmentName(""); setAudioPreviewUrl(null); setReplacement(null);
+    uploadedFiles.current.primary = false;
   }
   function requestRecording() {
     if (!recording && attachment) { setReplacement({ kind: "record" }); return; }
@@ -183,6 +198,13 @@ export function VolunteerShell() {
     if (!file) return;
     if (attachment) setReplacement({ kind: "file", file });
     else selectAttachment(file);
+  }
+  function requestSupportingAttachment(file?: File) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error("Choose a file smaller than 10 MB."); return; }
+    if (!file.type.startsWith("audio/") && !["image/jpeg", "image/png"].includes(file.type)) { toast.error("Use a supported audio, JPG, or PNG file."); return; }
+    setSupportingAttachment(file);
+    uploadedFiles.current.supporting = false;
   }
   function confirmReplacement() {
     const next = replacement; setReplacement(null);
@@ -232,17 +254,17 @@ export function VolunteerShell() {
               <div data-no-ui-translation className="input-mode" role="group" aria-label={t("inputMode")}><button type="button" disabled={recording} aria-pressed={inputMode === "write"} aria-controls="written-input" onClick={()=>setInputMode("write")}>{t("writeMode")}</button><button type="button" aria-pressed={inputMode === "record"} aria-controls="recorded-input" onClick={()=>setInputMode("record")}>{t("recordMode")}</button></div>
               <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label htmlFor="country">Country</Label><select id="country" value={country} onChange={(e) => changeCountry(e.target.value as "IN"|"BR"|"ZA")} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm">{countries.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></div><div className="space-y-1"><Label data-no-ui-translation htmlFor="language">{t("reportLanguage")}</Label><select id="language" value={language} onChange={(e) => setLanguage(e.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm">{languages.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div></div>
               <div id="written-input" hidden={inputMode !== "write"} className="space-y-2"><Label htmlFor="report">Describe the issue</Label><Textarea id="report" value={text} onChange={(e) => setText(e.target.value)} placeholder="Describe the issue, how long it has existed, and the outcome you are requesting." className="min-h-36 bg-background" /></div>
-              <div id="recorded-input" hidden={inputMode !== "record"} className="rounded-lg border border-accent/20 bg-accent/5 p-4"><Button type="button" className="w-full sm:w-auto" variant={recording ? "secondary" : "accent"} onClick={requestRecording}>{recording ? <><Pause className="mr-2 h-4 w-4"/>Stop recording · {recordingSeconds}s</> : <><Mic className="mr-2 h-4 w-4"/>Record your report</>}</Button>{recording ? <div aria-label="Recording waveform" className="mt-4 flex h-8 items-center gap-1">{Array.from({ length: 20 }, (_, index) => <span key={index} className="w-1 animate-pulse rounded-full bg-accent" style={{ height: `${8 + ((index * 7) % 22)}px` }}/>)}</div> : null}{audioPreviewUrl ? <div className="mt-4 grid gap-3"><audio controls aria-label="Report audio preview" src={audioPreviewUrl} className="w-full"/><Button data-no-ui-translation size="sm" variant="ghost" className="w-fit" onClick={deleteAttachment}><RotateCcw className="mr-2 h-4 w-4"/>{t("deleteRecording")}</Button></div> : null}<label htmlFor="voice-evidence" className="mt-3 inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-border px-3 text-sm"><Upload className="mr-2 h-4 w-4"/>Upload an audio file</label><input id="voice-evidence" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg" className="sr-only" onChange={e=>{requestAttachment(e.target.files?.[0]);e.target.value="";}}/><p className="mt-3 text-sm text-muted-foreground">Audio is private. The original is preserved for supported transcription and translation.</p></div>
+              <div id="recorded-input" hidden={inputMode !== "record"} className="rounded-lg border border-accent/20 bg-accent/5 p-4"><Button type="button" className="w-full sm:w-auto" variant={recording ? "secondary" : "accent"} onClick={requestRecording}>{recording ? <><Pause className="mr-2 h-4 w-4"/>Stop recording · {recordingSeconds}s</> : <><Mic className="mr-2 h-4 w-4"/>Record your report</>}</Button>{recording ? <div aria-label="Recording waveform" className="mt-4 flex h-8 items-center gap-1">{Array.from({ length: 20 }, (_, index) => <span key={index} className="w-1 animate-pulse rounded-full bg-accent" style={{ height: `${8 + ((index * 7) % 22)}px` }}/>)}</div> : null}{audioPreviewUrl ? <div className="mt-4 grid gap-3"><audio controls aria-label="Report audio preview" src={audioPreviewUrl} className="w-full"/><Button data-no-ui-translation size="sm" variant="ghost" className="w-fit" onClick={deleteAttachment}><RotateCcw className="mr-2 h-4 w-4"/>{t("deleteRecording")}</Button></div> : null}<label htmlFor="voice-evidence" className="mt-3 inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-border px-3 text-sm"><Upload className="mr-2 h-4 w-4"/>Upload an audio file</label><input id="voice-evidence" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm" className="sr-only" onChange={e=>{requestAttachment(e.target.files?.[0]);e.target.value="";}}/><p className="mt-3 text-sm text-muted-foreground">Audio is private. The original is preserved for supported transcription and translation.</p></div>
               <p data-no-ui-translation className="text-xs leading-relaxed text-muted-foreground">{t("modeHint")}{inputMode === "write" && audioPreviewUrl ? <span className="mt-1 block font-semibold">{t("savedAudio")}</span> : inputMode === "record" && text.trim() ? <span className="mt-1 block font-semibold">{t("savedText")}</span> : null}</p>
               <div className="intake-actions"><Button disabled={recording} className="w-full" onClick={goToLocation}>Continue to location <ArrowRight className="ml-2 h-4 w-4"/></Button></div>
             </> : null}
             {step === 2 ? <>
               <div className="space-y-2"><Label htmlFor="admin-area">Administrative area or landmark</Label><Input id="admin-area" value={adminHint} onChange={(e) => setAdminHint(e.target.value)} placeholder={`District, ward, or locality in ${countryName}`} aria-describedby="admin-area-help"/><p id="admin-area-help" className="text-sm text-muted-foreground">Required without browser location. Do not enter a house number or exact home address.</p></div>
               <div className="rounded-2xl border border-border bg-background p-4"><div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center"><div><p className="font-semibold">{location ? "Approximate location added" : "No browser location added"}</p><p className="text-sm text-muted-foreground">{location ? "Precision is reduced before submission; coordinates are not shown as the primary location." : "Country selection never creates coordinates. Administrative-area text is enough to continue."}</p></div><Button type="button" variant="outline" onClick={requestLocation}><LocateFixed className="mr-2 h-4 w-4"/>Use approximate location</Button></div></div>
-              <div className="rounded-2xl border border-border bg-background p-4"><Label htmlFor="evidence" className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-border px-4 py-2.5"><Upload className="mr-2 h-4 w-4"/>Attach optional evidence</Label><input id="evidence" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,image/jpeg,image/png" className="sr-only" onChange={(e) => { requestAttachment(e.target.files?.[0]); e.target.value=""; }}/><p className="mt-2 break-words text-sm text-muted-foreground">JPG, PNG, or supported audio; maximum 10 MB. {attachmentName ? `Selected: ${attachmentName}` : "No attachment selected."}</p>{attachment && attachment.type.startsWith("image/") ? <p className="mt-3 flex items-center gap-2 rounded-xl bg-muted/50 p-3 text-sm"><Upload className="h-4 w-4"/>Image ready for private upload</p> : null}{attachment ? <Button data-no-ui-translation variant="ghost" size="sm" className="mt-3" onClick={deleteAttachment}>{t("removeAttachment")}</Button> : null}</div>
+              <div className="rounded-2xl border border-border bg-background p-4"><Label htmlFor="evidence" className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-border px-4 py-2.5"><Upload className="mr-2 h-4 w-4"/>Attach optional evidence</Label><input id="evidence" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,image/jpeg,image/png" className="sr-only" onChange={(e) => { requestSupportingAttachment(e.target.files?.[0]); e.target.value=""; }}/><p className="mt-2 break-words text-sm text-muted-foreground">JPG, PNG, or supported audio; maximum 10 MB. {supportingAttachment ? `Selected: ${supportingAttachment.name}` : "No supporting file selected."}</p>{supportingAttachment && supportingAttachment.type.startsWith("image/") ? <p className="mt-3 flex items-center gap-2 rounded-xl bg-muted/50 p-3 text-sm"><Upload className="h-4 w-4"/>Image ready for private upload</p> : null}{supportingAttachment ? <Button data-no-ui-translation variant="ghost" size="sm" className="mt-3" onClick={() => { setSupportingAttachment(null); uploadedFiles.current.supporting = false; }}>{t("removeAttachment")}</Button> : null}</div>
               <div className="intake-actions flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button><Button className="flex-1" onClick={goToReview}>Review report <ArrowRight className="ml-2 h-4 w-4"/></Button></div>
             </> : null}
-            {step === 3 ? <><div className="grid gap-3 sm:grid-cols-2"><ReviewItem label="Country" value={countryName}/><ReviewItem label="Language" value={languages.find((item) => item.value === language)?.label ?? language}/><ReviewItem label="Administrative area" value={adminHint.trim() || "Approximate browser area"}/><ReviewItem label="Report" value={text.trim() || (attachment?.type.startsWith("audio/") ? "Voice recording" : "Attached evidence")}/><ReviewItem label="Attachment" value={attachmentName || "None"}/><ReviewItem label="Location precision" value={location ? "Reduced approximate area" : "Administrative area only; no coordinates"}/></div><label className="flex min-h-14 items-start gap-3 rounded-2xl border border-border bg-background p-4"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0"/><span><span className="font-semibold">I consent to CivicBridge processing this report.</span><span className="mt-1 block text-sm text-muted-foreground">Original content remains private; tracking stores only the request ID in this browser.</span></span></label>{createMutation.isPending ? <div aria-live="polite"><p className="mt-2 text-sm text-muted-foreground">{submissionPhase === "saving" ? "Saving report…" : "Uploading evidence…"}</p></div> : null}<div className="intake-actions flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button><Button className="flex-1" disabled={createMutation.isPending || recording} onClick={submit}>{createMutation.isPending ? <><RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>Submitting</> : <><Send className="mr-2 h-4 w-4"/>Submit request</>}</Button></div></> : null}
+            {step === 3 ? <><div className="grid gap-3 sm:grid-cols-2"><ReviewItem label="Country" value={countryName}/><ReviewItem label="Language" value={languages.find((item) => item.value === language)?.label ?? language}/><ReviewItem label="Administrative area" value={adminHint.trim() || "Approximate browser area"}/><ReviewItem label="Report" value={text.trim() || (attachment?.type.startsWith("audio/") || supportingAttachment?.type.startsWith("audio/") ? "Voice recording" : "Written report required")}/><ReviewItem label="Voice" value={attachmentName || (supportingAttachment?.type.startsWith("audio/") ? supportingAttachment.name : "None")}/><ReviewItem label="Supporting file" value={supportingAttachment?.name || "None"}/><ReviewItem label="Location precision" value={location ? "Reduced approximate area" : "Administrative area only; no coordinates"}/></div><label className="flex min-h-14 items-start gap-3 rounded-2xl border border-border bg-background p-4"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0"/><span><span className="font-semibold">I consent to CivicBridge processing this report.</span><span className="mt-1 block text-sm text-muted-foreground">Original content remains private; tracking stores only the request ID in this browser.</span></span></label>{createMutation.isPending ? <div aria-live="polite"><p className="mt-2 text-sm text-muted-foreground">{submissionPhase === "saving" ? "Saving report…" : "Uploading evidence…"}</p></div> : null}<div className="intake-actions flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button><Button className="flex-1" disabled={createMutation.isPending || recording} onClick={submit}>{createMutation.isPending ? <><RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>Submitting</> : <><Send className="mr-2 h-4 w-4"/>Submit request</>}</Button></div></> : null}
           </CardContent>
         </Card>
 
@@ -256,10 +278,20 @@ export function VolunteerShell() {
 }
 
 function StatusReview({ status, correction, setCorrection, confirm, confirming }: { status: CitizenStatus; correction: string; setCorrection: (value: string) => void; confirm: () => void; confirming: boolean }) {
-  const timeline: Record<string, string[]> = { submitted:["Received"], transcribing:["Received","Transcribing"], translating:["Received","Transcribing","Translating"], normalizing:["Received","Transcribing","Translating","Normalizing"], matching:["Received","Transcribing","Translating","Normalizing","Matching related reports"], hotspot_aggregated:["Received","Transcribing","Translating","Normalizing","Matching related reports","Updating hotspot"], under_review:["Received","Transcribing","Translating","Normalizing","Ready for confirmation"] };
+  const timeline: Record<string, string[]> = {
+    awaiting_media: ["Received", "Waiting for voice recording"], submitted: ["Received"],
+    transcribing: ["Received", "Transcribing"], translating: ["Received", "Transcribing", "Translating"],
+    normalizing: ["Received", "Processing"], matching: ["Received", "Matching related reports"],
+    under_review: ["Received", "Analyst review"], hotspot_aggregated: ["Received", "Grouped with related reports"],
+    recommended: ["Received", "Response proposed"], policy_approved: ["Received", "Approved for assessment"],
+    project_active: ["Received", "Project assessment or delivery"], project_completed: ["Received", "Delivery marked complete"],
+    project_cancelled: ["Received", "Project candidate cancelled"], outcome_tracking: ["Received", "Measurement recorded"],
+    processing_failed: ["Received", "Processing needs attention"], failed: ["Received", "Processing needs attention"],
+  };
   const confirmed = timeline[status.processing_stage] ?? [stageLabel(status.processing_stage)];
   return <div className="space-y-4"><div aria-label="Backend-confirmed processing timeline" className="flex flex-wrap gap-2">{confirmed.map((stage, index) => <Badge key={`${stage}-${index}`} variant={index === confirmed.length - 1 ? "accent" : "success"}>{stage}</Badge>)}</div><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-border p-4"><p className="text-xs uppercase text-muted-foreground">Stage</p><p className="mt-2 font-semibold capitalize">{stageLabel(status.processing_stage)}</p></div><div className="rounded-2xl border border-border p-4"><p className="text-xs uppercase text-muted-foreground">Category</p><p className="mt-2 font-semibold capitalize">{status.category ?? "Not supplied yet"}</p></div><div className="rounded-2xl border border-border p-4"><p className="text-xs uppercase text-muted-foreground">Hotspot score</p><p className="mt-2 font-semibold">{status.hotspot_score ?? "Not supplied yet"}</p></div></div>
-    {status.public_summary ? <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4"><div className="flex items-center gap-2 font-semibold"><CheckCircle2 className="h-5 w-5 text-accent"/>Review what we understood</div><p className="mt-3 text-sm leading-relaxed">{status.public_summary}</p><div className="mt-4 space-y-2"><Label htmlFor="correction">Correction or clarification (optional)</Label><Textarea id="correction" value={correction} onChange={(e) => setCorrection(e.target.value)} placeholder="Explain anything the normalized summary or category got wrong."/><Button onClick={confirm} disabled={confirming}>{confirming ? "Confirming…" : correction.trim() ? "Submit correction and confirm" : "Confirm report"}</Button></div></div> : <div className="rounded-2xl border border-border bg-muted/30 p-4"><FileAudio className="h-5 w-5 text-accent"/><p className="mt-2 font-semibold">We’re preparing your summary</p><p className="text-sm text-muted-foreground">Your summary will appear here when it is ready. You can then check it and make corrections.</p></div>}
+    {status.public_summary ? <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4"><div className="flex items-center gap-2 font-semibold"><CheckCircle2 className="h-5 w-5 text-accent"/>Latest progress update</div><p className="mt-3 text-sm leading-relaxed">{status.public_summary}</p>{status.outcome_status ? <p className="mt-2 text-sm">Latest measurement: {stageLabel(status.outcome_status)} · {status.measurement_source_type === "independently_verified" ? "independently verified" : "manually entered"}. This is not a causal impact claim.</p> : null}</div> : null}
+    {status.normalized_summary ? <div className="rounded-2xl border border-border bg-muted/30 p-4"><p className="font-semibold">What we understood from your report</p>{status.processing_mode === "mock" ? <Badge variant="warning" className="mt-2">Demo transcription and analysis</Badge> : null}<p className="mt-2 text-sm leading-relaxed">{status.normalized_summary}</p>{status.report_confirmed ? <p className="mt-3 text-sm text-muted-foreground">Report confirmed. Later project updates remain separate from this summary.</p> : <div className="mt-4 space-y-2"><Label htmlFor="correction">Correction or clarification (optional)</Label><Textarea id="correction" value={correction} onChange={(e) => setCorrection(e.target.value)} placeholder="Explain anything the summary or category got wrong."/><Button onClick={confirm} disabled={confirming}>{confirming ? "Confirming…" : correction.trim() ? "Submit correction and confirm" : "Confirm report"}</Button></div>}</div> : !status.public_summary ? <div className="rounded-2xl border border-border bg-muted/30 p-4"><FileAudio className="h-5 w-5 text-accent"/><p className="mt-2 font-semibold">We’re preparing your summary</p><p className="text-sm text-muted-foreground">Your summary will appear here when it is ready. You can then check it and make corrections.</p></div> : null}
     {status.project_title ? <div className="rounded-2xl border border-success/30 bg-success/5 p-4"><ShieldCheck className="h-5 w-5 text-success"/><p className="mt-2 font-semibold">Linked development project: {status.project_title}</p>{status.project_status ? <p className="text-sm text-muted-foreground">Status: {stageLabel(status.project_status)}</p> : null}</div> : null}
   </div>;
 }

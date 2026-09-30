@@ -59,7 +59,8 @@ class NormalizationService:
         self.repo = repository
         self.event_bus = event_bus
         self.citizen_client = citizen_client or CitizenChannelsClient(
-            base_url=settings.CITIZEN_CHANNELS_URL, timeout=settings.CITIZEN_CHANNELS_TIMEOUT_SECONDS
+            base_url=settings.CITIZEN_CHANNELS_URL, timeout=settings.CITIZEN_CHANNELS_TIMEOUT_SECONDS,
+            allow_mock=settings.USE_MOCK_SERVICES, internal_token=settings.CITIZEN_INTERNAL_TOKEN,
         )
         self.stt = stt or SpeechToTextAdapter(settings.USE_MOCK_SERVICES, settings.GCP_PROJECT_ID, settings.GCP_LOCATION)
         self.translator = translator or TranslationAdapter(settings.USE_MOCK_SERVICES, settings.GCP_PROJECT_ID, settings.GCP_LOCATION)
@@ -83,6 +84,8 @@ class NormalizationService:
         """
         existing = self.repo.get(request_id)
         if existing and not force:
+            if self.repo.database_url:
+                self.repo.dispatch_pending(self.event_bus)
             return existing, False
 
         content = self.citizen_client.get_content(request_id)
@@ -92,12 +95,26 @@ class NormalizationService:
         country_code = content.get("country_code", "IN")
         language_hint = content.get("language_hint", "en")
 
-        transcript_original, stt_status = self.stt.transcribe(
-            media_ref=content.get("media_ref"),
+        written_text = (content.get("text") or "").strip()
+        media_ref = content.get("media_ref")
+        audio_content = None
+        audio_fetch_failed = False
+        if media_ref and not self.settings.USE_MOCK_SERVICES:
+            try:
+                audio_content = self.citizen_client.get_audio(request_id, media_ref)
+            except Exception as exc:
+                logger.error("Private audio retrieval failed for %s: %s", request_id, exc)
+                audio_fetch_failed = True
+        audio_transcript, stt_status = self.stt.transcribe(
+            media_ref=media_ref,
             media_type=content.get("media_type"),
             language_code=language_hint,
-            fallback_text=content.get("text"),
-        )
+            fallback_text=written_text if not media_ref else None,
+            audio_content=audio_content,
+        ) if not audio_fetch_failed else ("", "failed")
+        transcript_original = audio_transcript
+        if written_text and media_ref:
+            transcript_original = f"{audio_transcript}\nWritten context: {written_text}" if audio_transcript else written_text
 
         translation_working, translation_status = self.translator.translate(
             transcript_original, source_lang=language_hint, target_lang="en"
@@ -135,8 +152,11 @@ class NormalizationService:
         if stt_status == "failed":
             needs_review = True
             cleaned["review_reason"] = cleaned.get("review_reason") or "speech_to_text_failed"
+        if translation_status in {"failed", "mock_untranslated"} or extraction_status == "failed_fallback":
+            needs_review = True
+            cleaned["review_reason"] = cleaned.get("review_reason") or "provider_processing_failed"
 
-        model_name = self.settings.GEMINI_MODEL_NAME if not self.settings.USE_MOCK_SERVICES else "mock-rule-engine"
+        model_name = "mock-rule-engine" if extraction_status == "mock" else self.settings.GEMINI_MODEL_NAME if extraction_status in {"ok", "schema_invalid_retried_ok"} else "unavailable"
 
         result = NormalizedRequestData(
             request_id=request_id,
@@ -148,10 +168,16 @@ class NormalizationService:
             anonymized_original_summary=None,
             translation=TranslationMetadata(
                 performed=translation_status == "ok" and language_hint.split("-")[0].lower() != "en",
-                provider=("mock-translation" if self.settings.USE_MOCK_SERVICES else "google-cloud-translation")
-                if translation_status == "ok" else None,
+                provider=("mock-translation" if self.settings.USE_MOCK_SERVICES else "google-cloud-translation") if translation_status == "ok" else None,
                 confidence=None,
             ),
+            processing_mode="mock" if self.settings.USE_MOCK_SERVICES else "degraded" if stt_status == "failed" or translation_status == "failed" or extraction_status == "failed_fallback" else "live",
+            speech_provider="mock-transcript" if stt_status == "mock" else "google-cloud-speech-v2" if stt_status == "ok" else None,
+            speech_model="long" if stt_status == "ok" else None,
+            speech_status=stt_status,
+            translation_status=translation_status,
+            extraction_status=extraction_status,
+            fallback_used=stt_status == "failed" or translation_status == "failed" or extraction_status == "failed_fallback",
             transcript_original=masked_original,
             translation_working=masked_translation,
             category=cleaned["category"],
@@ -173,8 +199,6 @@ class NormalizationService:
         )
 
         status = "needs_review" if needs_review else "normalized"
-        record = self.repo.save(request_id, result, status)
-
         event_type = "request.needs_review.v1" if needs_review else "request.normalized.v1"
         event = EventEnvelope(
             event_type=event_type,
@@ -182,7 +206,17 @@ class NormalizationService:
             data=result.model_dump(),
             **({"trace_id": trace_id} if trace_id else {}),
         )
-        self.event_bus.publish(event)
+        if self.repo.database_url and not force:
+            record, created = self.repo.save_if_absent(request_id, result, status, event)
+            if not created:
+                self.repo.dispatch_pending(self.event_bus)
+                return record, False
+        else:
+            record = self.repo.save(request_id, result, status, event if self.repo.database_url else None)
+        if self.repo.database_url:
+            self.repo.dispatch_pending(self.event_bus)
+        else:
+            self.event_bus.publish(event)
 
         logger.info(
             "Normalized request %s -> %s (category=%s, confidence=%.2f, stt=%s, translation=%s, extraction=%s)",
@@ -227,8 +261,12 @@ class NormalizationService:
             data=approved_result.model_dump(),
             **({"trace_id": trace_id} if trace_id else {}),
         )
-        self.event_bus.publish(event)
         record.record_approval(approved_result, reviewer_id, reviewer_role)
+        self.repo.persist(record, event if self.repo.database_url else None)
+        if self.repo.database_url:
+            self.repo.dispatch_pending(self.event_bus)
+        else:
+            self.event_bus.publish(event)
         logger.info(
             "Human review approved request %s (reviewer_role=%s)",
             request_id,

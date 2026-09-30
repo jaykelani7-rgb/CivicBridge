@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import sys
 from pathlib import Path
 
@@ -10,10 +11,10 @@ if str(root_dir) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from packages.cloud_runtime import BigQueryDeliveryLedger, PubSubEventBus
-from packages.event_bus import configure_event_bus
+from packages.event_bus import configure_event_bus, get_event_bus
+from packages.durable_outbox import poll_forever
 from services.policy_impact.app.config import settings
 from services.policy_impact.app.database import get_repository
-from services.policy_impact.app.demo_baseline import restore_demo_recommendations
 
 if settings.EVENT_BUS == "pubsub":
     configure_event_bus(PubSubEventBus(settings.PUBSUB_PROJECT, {
@@ -36,9 +37,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-
-if settings.ENVIRONMENT == "production":
-    restore_demo_recommendations(get_repository())
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -70,6 +68,31 @@ app.state.delivery_ledger = (
     BigQueryDeliveryLedger(settings.GCP_PROJECT_ID, settings.BIGQUERY_DATASET, settings.GCP_LOCATION)
     if settings.IDEMPOTENCY_BACKEND == "bigquery" else None
 )
+
+
+@app.on_event("startup")
+def recover_committed_events() -> None:
+    """Replay a prior process's committed but unpublished policy events."""
+    get_repository().dispatch_pending(get_event_bus())
+
+
+@app.on_event("startup")
+async def start_outbox_retry() -> None:
+    app.state.outbox_task = asyncio.create_task(poll_forever(
+        lambda: get_repository().dispatch_pending(get_event_bus(), fail_on_error=True),
+        logging.getLogger("policy-outbox"),
+    ))
+
+
+@app.on_event("shutdown")
+async def stop_outbox_retry() -> None:
+    task = getattr(app.state, "outbox_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 @app.get("/")

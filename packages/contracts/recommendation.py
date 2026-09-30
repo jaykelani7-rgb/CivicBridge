@@ -25,16 +25,23 @@ class Recommendation(BaseModel):
     recommendation_id: str = Field(default_factory=lambda: str(uuid4()))
     hotspot_id: str
     evidence_bundle_id: str
+    country_code: Optional[str] = None
+    category: Optional[str] = None
+    evidence_sources: List[dict] = Field(default_factory=list)
+    quantitative_claims: List[dict] = Field(default_factory=list)
     title: str
     problem: str
     proposed_intervention: str
-    intended_beneficiaries: int
+    intended_beneficiaries: Optional[int] = None
     supporting_evidence_ids: List[str] = Field(default_factory=list)
     risks: List[str] = Field(default_factory=list)
     missing_information: List[str] = Field(default_factory=list)
-    confidence: float = Field(..., ge=0.0, le=1.0)
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     status: RecommendationStatus = RecommendationStatus.UNDER_REVIEW
     ai_draft: bool = True
+    processing_mode: str = "unknown"
+    draft_provider: Optional[str] = None
+    draft_model: Optional[str] = None
     human_approved: bool = False
     assigned_department: Optional[str] = None
     assigned_reviewer: Optional[str] = None

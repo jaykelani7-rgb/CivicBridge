@@ -20,9 +20,17 @@ logger = logging.getLogger("ai-normalization.citizen-channels-client")
 
 
 class CitizenChannelsClient:
-    def __init__(self, base_url: Optional[str] = None, timeout: Optional[float] = None):
+    def __init__(self, base_url: Optional[str] = None, timeout: Optional[float] = None, allow_mock: Optional[bool] = None, internal_token: Optional[str] = None):
         self.base_url = base_url or settings.CITIZEN_CHANNELS_URL
         self.timeout = timeout if timeout is not None else settings.CITIZEN_CHANNELS_TIMEOUT_SECONDS
+        self.allow_mock = settings.USE_MOCK_SERVICES if allow_mock is None else allow_mock
+        self.internal_token = internal_token if internal_token is not None else settings.CITIZEN_INTERNAL_TOKEN
+
+    def _headers(self):
+        headers = cloud_run_headers(self.base_url, settings.AUTHENTICATE_CLOUD_RUN)
+        if self.internal_token:
+            headers["X-Internal-Token"] = self.internal_token
+        return headers
 
     def get_content(self, request_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -36,23 +44,33 @@ class CitizenChannelsClient:
         try:
             resp = httpx.get(
                 f"{self.base_url}/internal/v1/requests/{request_id}/content",
-                headers=cloud_run_headers(self.base_url, settings.AUTHENTICATE_CLOUD_RUN),
+                headers=self._headers(),
                 timeout=self.timeout,
             )
             if resp.status_code == 200:
                 return resp.json()
             if resp.status_code == 404:
                 return None
+            if not self.allow_mock:
+                raise RuntimeError(f"Citizen content retrieval returned HTTP {resp.status_code}")
         except Exception as exc:
-            logger.warning(
-                "Citizen Channels service unreachable at %s (%s). "
-                "Falling back to deterministic mock content so the AI Normalization "
-                "service stays independently testable.",
-                self.base_url,
-                exc,
-            )
+            if not self.allow_mock:
+                raise RuntimeError("Citizen content retrieval failed") from exc
+            logger.warning("Citizen service unreachable in explicit demo mode (%s)", exc)
 
         return self._mock_content(request_id)
+
+    def get_audio(self, request_id: str, media_ref: str) -> bytes:
+        response = httpx.get(
+            f"{self.base_url}/internal/v1/requests/{request_id}/media",
+            params={"media_ref": media_ref}, headers=self._headers(), timeout=self.timeout,
+        )
+        response.raise_for_status()
+        if not response.headers.get("content-type", "").startswith("audio/"):
+            raise ValueError("Internal media response was not audio")
+        if not response.content or len(response.content) > 10 * 1024 * 1024:
+            raise ValueError("Internal audio is empty or too large")
+        return response.content
 
     @staticmethod
     def _mock_content(request_id: str) -> Dict[str, Any]:

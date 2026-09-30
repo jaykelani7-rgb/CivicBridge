@@ -1,5 +1,6 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -23,6 +24,12 @@ class Settings(BaseSettings):
     GCP_LOCATION: str = os.getenv("GCP_LOCATION", "us-central1")
     BIGQUERY_DATASET: str = os.getenv("POLICY_BIGQUERY_DATASET", "civicbridge_policy_impact")
     AUTHENTICATE_CLOUD_RUN: bool = os.getenv("POLICY_AUTHENTICATE_CLOUD_RUN", "false").lower() == "true"
+
+    @model_validator(mode="after")
+    def forbid_production_mocks(self):
+        if self.ENVIRONMENT.lower() == "production" and self.ENABLE_MOCK_STUBS:
+            raise ValueError("ENABLE_MOCK_STUBS must be false in production")
+        return self
 
 
 settings = Settings()

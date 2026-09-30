@@ -1,4 +1,5 @@
 import {expect,test} from '@playwright/test';
+import {mkdirSync} from 'node:fs';
 test('populated real components fit all requested sizes and cannot make API writes',async({page})=>{
   const apiRequests:string[]=[];page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/'))apiRequests.push(request.url());});
   await page.goto('/');await expect(page.getByText(/ISOLATED TEST FIXTURES/)).toBeVisible();
@@ -35,4 +36,29 @@ test('public detail and translated cards keep long localities visible',async({pa
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog').getByText(/School entrance and the eastern access lane/)).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('capture responsive policy workspace and decision drawer fixtures',async({page})=>{
+  const directory='../docs/staff-workspace/screenshots';mkdirSync(directory,{recursive:true});
+  await page.goto('/');
+  await page.getByRole('navigation',{name:'Fixture surfaces'}).getByRole('button',{name:'policy',exact:true}).click();
+  await page.getByRole('button',{name:'Cancel'}).click();
+  for(const [label,width,height] of [['mobile',390,844],['tablet',768,1024],['laptop',1280,800],['desktop',1440,900]] as const){
+    await page.setViewportSize({width,height});
+    await expect(page.getByRole('heading',{name:'Policy & impact'})).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),label).toBe(true);
+    await page.screenshot({path:`${directory}/policy-${label}.png`,fullPage:true});
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('navigation',{name:'Mobile policy sections'}).getByRole('button',{name:'Queue'}).click();
+  await expect(page.getByRole('navigation',{name:'Mobile policy sections'}).getByRole('button',{name:'Queue'})).toHaveClass(/bg-accent/);
+  await page.screenshot({path:`${directory}/queue-mobile.png`,fullPage:true});
+  await page.getByRole('navigation',{name:'Mobile policy sections'}).getByRole('button',{name:'Brief'}).click();
+  await page.getByRole('button',{name:'Record decision'}).click();
+  await expect(page.getByRole('dialog',{name:'Decision drawer fixture'})).toBeVisible();
+  await page.screenshot({path:`${directory}/decision-mobile.png`});
+  await page.getByRole('button',{name:'Close'}).click();
+  await page.setViewportSize({width:1440,height:900});
+  await page.getByRole('button',{name:'Record decision'}).click();
+  await page.screenshot({path:`${directory}/decision-desktop.png`});
 });

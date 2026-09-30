@@ -24,4 +24,4 @@ export const citizenApi = {
   },
 };
 
-export const TERMINAL_CITIZEN_STAGES = new Set(["policy_approved", "project_active", "completed", "failed", "rejected"]);
+export const TERMINAL_CITIZEN_STAGES = new Set(["completed", "failed", "rejected"]);

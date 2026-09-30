@@ -241,7 +241,7 @@ def test_policy_brief_draft_grounds_citations_to_bundle(client):
     body = resp.json()
     assert set(body["supporting_evidence_ids"]).issubset({"src_population_42", "cluster_drainage_42"})
     assert body["intended_beneficiaries"] == 5000
-    assert isinstance(body["confidence"], float)
+    assert body["confidence"] is None
 
 
 def test_policy_brief_draft_response_shape_matches_recommendation_service_expectations(client):
@@ -257,4 +257,4 @@ def test_policy_brief_draft_response_shape_matches_recommendation_service_expect
     body = resp.json()
     for key in ("title", "problem", "proposed_intervention", "intended_beneficiaries", "supporting_evidence_ids", "risks", "missing_information", "confidence"):
         assert key in body
-    assert isinstance(body["intended_beneficiaries"], int)
+    assert body["intended_beneficiaries"] is None

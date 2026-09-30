@@ -36,16 +36,18 @@ class AINormalizationClient:
                 raise
 
         # Default fallback AI draft engine
-        valid_ids = evidence_bundle.get("valid_evidence_ids", ["src_population_42", "cluster_drainage_42"])
+        valid_ids = evidence_bundle.get("valid_evidence_ids", [])
         summary = evidence_bundle.get("summary", "Infrastructure improvement demand hotspot.")
 
         return {
             "title": f"Infrastructure rehabilitation brief for {hotspot_id[:8]}",
             "problem": summary,
             "proposed_intervention": "Conduct an engineering feasibility study and construct upgraded infrastructure capacity.",
-            "intended_beneficiaries": 12400,
+            "intended_beneficiaries": (evidence_bundle.get("demographic_indicators") or {}).get("affected_population"),
             "supporting_evidence_ids": valid_ids,
             "risks": ["Current capacity survey requires detailed field validation."],
             "missing_information": ["Detailed engineering design and soil load analysis"],
-            "confidence": 0.85,
+            "confidence": None,
+            "processing_mode": "mock",
+            "provider": "deterministic-demo",
         }

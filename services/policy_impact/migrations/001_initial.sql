@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS recommendations (recommendation_id TEXT PRIMARY KEY, hotspot_id TEXT NOT NULL, evidence_bundle_id TEXT NOT NULL, title TEXT NOT NULL, data_json TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS policy_decisions (decision_id TEXT PRIMARY KEY, recommendation_id TEXT NOT NULL, action TEXT NOT NULL, actor_id TEXT NOT NULL, data_json TEXT NOT NULL, decided_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS projects (project_id TEXT PRIMARY KEY, recommendation_id TEXT NOT NULL, hotspot_id TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, data_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS milestones (milestone_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, data_json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS impact_metrics (metric_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, metric_code TEXT NOT NULL, data_json TEXT NOT NULL, recorded_at TEXT NOT NULL);

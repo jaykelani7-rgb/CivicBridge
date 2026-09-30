@@ -17,7 +17,7 @@ describe("citizen media and polling", () => {
 
   it("terminates polling on terminal stages, pause, and attempt bound", () => {
     expect(nextCitizenPollDelay("normalizing", 2, true)).toBe(4000);
-    expect(nextCitizenPollDelay("project_active", 2, true)).toBe(false);
+    expect(nextCitizenPollDelay("project_active", 2, true)).toBe(4000);
     expect(nextCitizenPollDelay("normalizing", 8, true)).toBe(false);
     expect(nextCitizenPollDelay("normalizing", 2, false)).toBe(false);
   });

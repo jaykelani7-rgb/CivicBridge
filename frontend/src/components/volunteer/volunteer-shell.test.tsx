@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicLocaleProvider } from "@/components/providers/public-locale-provider";
+import { citizenApi } from "@/lib/api/citizen";
 import { VolunteerShell } from "./volunteer-shell";
 
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => "/volunteer" }));
@@ -19,7 +20,7 @@ beforeEach(() => {
   Object.defineProperty(navigator,"mediaDevices",{configurable:true,value:{getUserMedia:vi.fn().mockResolvedValue({getTracks:()=>[{stop:vi.fn()}]})}});
   URL.createObjectURL=vi.fn(()=>`blob:audio-${++serial}`); URL.revokeObjectURL=vi.fn();
 });
-afterEach(()=>{cleanup();vi.unstubAllGlobals();window.localStorage.clear();});
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();window.localStorage.clear();});
 
 function mount() { return render(<QueryClientProvider client={new QueryClient()}><PublicLocaleProvider><VolunteerShell/></PublicLocaleProvider></QueryClientProvider>); }
 
@@ -74,5 +75,32 @@ describe("Citizen Portal accessibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /Continue to location/i }));
     expect(screen.getByText("No browser location added")).toBeInTheDocument();
     expect(screen.getByText(/Country selection never creates coordinates/i)).toBeInTheDocument();
+  });
+
+  it("uploads a voice report and supporting photo without replacing either", async () => {
+    const created = vi.spyOn(citizenApi, "create").mockResolvedValue({request_id:"request-1", status:"awaiting_media", receipt_id:"RCT-1", message:"Accepted", submitted_at:"2026-09-30T00:00:00Z"});
+    const mediaReceipt = {request_id:"request-1", media_ref:"private://media", filename:"saved", size_bytes:3, status:"uploaded"};
+    const uploaded = vi.spyOn(citizenApi, "upload").mockResolvedValueOnce(mediaReceipt).mockRejectedValueOnce(new Error("Upload unavailable")).mockResolvedValue(mediaReceipt);
+    vi.spyOn(citizenApi, "status").mockResolvedValue({request_id:"request-1", channel:"web_voice", country_code:"IN", submitted_at:"2026-09-30T00:00:00Z", processing_stage:"submitted", public_summary:null, category:null, hotspot_score:null, project_title:null, project_status:null, hotspot_id:null, recommendation_id:null, project_id:null, pii_masked:true});
+    mount();
+    fireEvent.click(screen.getByRole("button",{name:"Record"}));
+    fireEvent.change(document.querySelector<HTMLInputElement>("#voice-evidence")!,{target:{files:[new File(["voice"],"voice.wav",{type:"audio/wav"})]}});
+    fireEvent.click(screen.getByRole("button",{name:/Continue to location/}));
+    fireEvent.change(screen.getByLabelText("Administrative area or landmark"),{target:{value:"Ward 42"}});
+    fireEvent.change(document.querySelector<HTMLInputElement>("#evidence")!,{target:{files:[new File(["photo"],"drain.jpg",{type:"image/jpeg"})]}});
+    expect(screen.getByText(/Selected: drain.jpg/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:/Review report/}));
+    expect(screen.getByText("voice.wav")).toBeInTheDocument();
+    expect(screen.getByText("drain.jpg")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button",{name:"Submit request"}));
+    await waitFor(()=>expect(uploaded).toHaveBeenCalledTimes(2));
+    await screen.findByText("Upload unavailable");
+    expect(window.localStorage.getItem("civicbridge:request-id")).toBe("request-1");
+    fireEvent.click(screen.getByRole("button",{name:"Submit request"}));
+    await waitFor(()=>expect(uploaded).toHaveBeenCalledTimes(3));
+    expect(created.mock.calls[0][0].channel).toBe("web_voice");
+    expect(created.mock.calls[0][1]).toBe(created.mock.calls[1][1]);
+    expect(uploaded.mock.calls.map((call)=>call[2])).toEqual(["voice.wav","drain.jpg","drain.jpg"]);
   });
 });

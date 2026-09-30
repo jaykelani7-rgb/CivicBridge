@@ -40,10 +40,18 @@ export const citizenStatusSchema = z.object({
   submitted_at: z.string(),
   processing_stage: z.string(),
   public_summary: nullableString,
+  normalized_summary: nullableString.optional(),
+  processing_mode: nullableString.optional(),
+  report_confirmed: z.boolean().optional(),
   category: nullableString,
   hotspot_score: nullableNumber,
   project_title: nullableString,
   project_status: nullableString,
+  hotspot_id: nullableString,
+  recommendation_id: nullableString,
+  project_id: nullableString,
+  outcome_status: nullableString.optional(),
+  measurement_source_type: nullableString.optional(),
   pii_masked: z.boolean(),
   trace_id: z.string().optional(),
 });
@@ -306,9 +314,13 @@ export const evidenceBundleSchema = z.object({
 
 export const recommendationSchema = z.object({
   recommendation_id: z.string(), hotspot_id: z.string(), evidence_bundle_id: z.string(),
+  country_code: nullableString, category: nullableString,
   title: z.string(), problem: z.string(), proposed_intervention: z.string(),
-  intended_beneficiaries: z.number(), supporting_evidence_ids: z.array(z.string()),
-  risks: z.array(z.string()), missing_information: z.array(z.string()), confidence: z.number(),
+  intended_beneficiaries: nullableNumber, supporting_evidence_ids: z.array(z.string()),
+  risks: z.array(z.string()), missing_information: z.array(z.string()), confidence: nullableNumber,
+  processing_mode: nullableString, draft_provider: nullableString, draft_model: nullableString,
+  evidence_sources: z.array(z.object({ source_id: z.string(), title: nullableString, publisher: nullableString, url: nullableString, reference_period: nullableString, retrieved_at: nullableString, finding: nullableString, provenance: nullableString })).optional(),
+  quantitative_claims: z.array(z.object({ claim_field: z.string(), value: z.number(), source_field: z.string(), source_id: z.string(), calculation: z.string() })).optional(),
   status: z.string(), ai_draft: z.boolean(), human_approved: z.boolean(),
   assigned_department: nullableString, assigned_reviewer: nullableString,
   created_at: z.string(), updated_at: z.string(), schema_version: z.string(),
@@ -330,7 +342,9 @@ export const projectSchema = z.object({
 
 export const metricSchema = z.object({
   metric_id: z.string(), project_id: z.string(), metric_code: z.string(),
-  baseline: z.number(), target: z.number(), current: z.number(), unit: z.string(),
-  source_id: z.string(), measured_at: z.string(), confidence: z.number(),
+  baseline: nullableNumber, target: nullableNumber, current: nullableNumber, unit: z.string(),
+  direction: z.enum(["higher_is_better", "lower_is_better"]).default("lower_is_better"),
+  source_id: z.string(), measured_at: z.string(), confidence: nullableNumber,
+  source_type: z.enum(["manual", "independently_verified"]).default("manual"), methodology: nullableString,
   outcome_status: z.string(), recorded_at: z.string(), schema_version: z.string(),
 });

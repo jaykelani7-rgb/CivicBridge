@@ -34,3 +34,25 @@ def test_missing_data_uses_documented_fallback_and_reduces_confidence(app):
 def test_scores_are_clamped():
     assert clamp(-10) == 0
     assert clamp(110) == 100
+
+
+def test_matched_infrastructure_and_investment_evidence_changes_priority(app):
+    """Synthetic test input demonstrates the deterministic effects, not an official pilot import."""
+    engine = app.state.pipeline.scoring
+    members = app.state.repository.get_cluster_members("11000000-0000-4000-8000-000000000001")
+    baseline = app.state.repository.get_enrichment("IN-RJ-JPR-W42", "drainage")
+    from copy import deepcopy
+    high_gap = deepcopy(baseline)
+    high_gap["infrastructure"]["infrastructure_gap"] = 90
+    aligned = deepcopy(high_gap)
+    aligned["projects"][0]["strategic_alignment"] = 90
+    covered = deepcopy(aligned)
+    covered["projects"][0]["existing_coverage_penalty"] = 30
+    now = datetime(2026, 8, 20, tzinfo=timezone.utc)
+    first = engine.calculate(members, baseline, .88, now)
+    gap = engine.calculate(members, high_gap, .88, now)
+    plan = engine.calculate(members, aligned, .88, now)
+    coverage = engine.calculate(members, covered, .88, now)
+    assert gap.need_score >= first.need_score
+    assert plan.action_score >= gap.action_score
+    assert coverage.action_score < plan.action_score

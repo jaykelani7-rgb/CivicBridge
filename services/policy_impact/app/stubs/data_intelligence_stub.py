@@ -45,9 +45,11 @@ class DataIntelligenceClient:
     def get_evidence_bundle(self, hotspot_id: str, evidence_bundle_id: str) -> Optional[dict]:
         if self.enable_mock:
             if evidence_bundle_id in self._fixtures_cache:
-                return self._fixtures_cache[evidence_bundle_id].get("evidence_bundle")
+                fixture = self._fixtures_cache[evidence_bundle_id]
+                return {**fixture["evidence_bundle"], "hotspot_snapshot": fixture.get("hotspot", {}), "provenance": "synthetic_demo"}
             if hotspot_id in self._fixtures_cache:
-                return self._fixtures_cache[hotspot_id].get("evidence_bundle")
+                fixture = self._fixtures_cache[hotspot_id]
+                return {**fixture["evidence_bundle"], "hotspot_snapshot": fixture.get("hotspot", {}), "provenance": "synthetic_demo"}
             # Default fallback fixture
             return {
                 "evidence_bundle_id": evidence_bundle_id,

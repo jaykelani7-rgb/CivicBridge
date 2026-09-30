@@ -10,6 +10,7 @@ GCP_PROJECT_ID and flipping the flag off.
 """
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
     # Host service dependency (Sujal's Citizen Channels service)
     CITIZEN_CHANNELS_URL: str = os.getenv("CITIZEN_CHANNELS_URL", "http://127.0.0.1:8000")
     CITIZEN_CHANNELS_TIMEOUT_SECONDS: float = float(os.getenv("CITIZEN_CHANNELS_TIMEOUT_SECONDS", "3.0"))
+    CITIZEN_INTERNAL_TOKEN: str = os.getenv("CITIZEN_INTERNAL_TOKEN", "")
 
     # Google Cloud / Vertex AI configuration
     USE_MOCK_SERVICES: bool = os.getenv("USE_MOCK_SERVICES", "true").lower() == "true"
@@ -47,6 +49,12 @@ class Settings(BaseSettings):
     IDEMPOTENCY_BACKEND: str = os.getenv("AI_IDEMPOTENCY_BACKEND", "local")
     BIGQUERY_DATASET: str = os.getenv("AI_BIGQUERY_DATASET", "civicbridge_ai_normalization")
     AUTHENTICATE_CLOUD_RUN: bool = os.getenv("AI_AUTHENTICATE_CLOUD_RUN", "false").lower() == "true"
+
+    @model_validator(mode="after")
+    def forbid_production_mocks(self):
+        if self.ENVIRONMENT.lower() == "production" and self.USE_MOCK_SERVICES:
+            raise ValueError("USE_MOCK_SERVICES must be false in production")
+        return self
 
 
 settings = Settings()

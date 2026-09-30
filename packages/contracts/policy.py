@@ -8,11 +8,11 @@ class RecommendationData(BaseModel):
     title: str
     problem: str
     proposed_intervention: str
-    intended_beneficiaries: int
+    intended_beneficiaries: Optional[int] = None
     supporting_evidence_ids: List[str] = Field(default_factory=list)
     risks: List[str] = Field(default_factory=list)
     missing_information: List[str] = Field(default_factory=list)
-    confidence: float
+    confidence: Optional[float] = None
     status: str = "under_review"
     ai_draft: bool = True
     human_approved: bool = False
@@ -30,10 +30,11 @@ class PolicyDecisionData(BaseModel):
 class ImpactMetricData(BaseModel):
     project_id: str
     metric_code: str
-    baseline: float
-    target: float
-    current: float
+    baseline: Optional[float] = None
+    target: Optional[float] = None
+    current: Optional[float] = None
+    direction: str = "lower_is_better"
     unit: str
     source_id: str
     measured_at: str
-    confidence: float
+    confidence: Optional[float] = None
