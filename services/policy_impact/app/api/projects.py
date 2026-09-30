@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from packages.contracts import (
     Project,
     ProjectCreateRequest,
+    ProjectStatusUpdateRequest,
     StandardErrorResponse,
 )
 from services.policy_impact.app.services.project_impact_service import ProjectImpactService
@@ -44,3 +45,11 @@ def get_project(project_id: str):
             detail={"error": {"code": "PROJECT_NOT_FOUND", "message": f"Project {project_id} not found."}},
         )
     return project
+
+
+@router.patch("/{project_id}/status", response_model=Project)
+def update_project_status(project_id: str, req: ProjectStatusUpdateRequest):
+    try:
+        return service.update_project_status(project_id, req)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error

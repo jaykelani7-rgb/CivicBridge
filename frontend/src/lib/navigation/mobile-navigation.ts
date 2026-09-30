@@ -30,9 +30,9 @@ const more = { id: "more", label: "More", href: "/more", icon: MoreHorizontal } 
 
 export const staffNavigation: Record<StaffRole, readonly MobileNavItemConfig[]> = {
   analyst: [commandCenter.overview, commandCenter.hotspots, commandCenter.review, commandCenter.evidence, more],
-  policymaker: [commandCenter.overview, commandCenter.hotspots, commandCenter.review, policyWorkspace.policy, more],
+  policymaker: [commandCenter.overview, commandCenter.review, policyWorkspace.policy, policyWorkspace.projects, policyWorkspace.impact],
   csr_partner: [policyWorkspace.overview, policyWorkspace.projects, policyWorkspace.impact, { id: "explore", label: "Explore", href: "/hotspots", icon: MapPinned }, more],
-  admin: [commandCenter.overview, commandCenter.hotspots, commandCenter.review, policyWorkspace.policy, more],
+  admin: [commandCenter.overview, commandCenter.review, policyWorkspace.policy, policyWorkspace.projects, policyWorkspace.impact],
 };
 
 export function isMobileNavItemActive(item: MobileNavItemConfig, pathname: string, hash = ""): boolean {

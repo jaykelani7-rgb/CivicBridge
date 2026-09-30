@@ -232,8 +232,7 @@ class GeminiExtractionAdapter:
                 vertexai.init(project=project_id, location=location)
                 self._model = GenerativeModel(model_name)
             except Exception as exc:
-                logger.warning("Failed to initialize Vertex AI Gemini (%s). Falling back to mock extraction.", exc)
-                self.use_mock = True
+                logger.error("Failed to initialize Vertex AI Gemini (%s).", exc)
 
     def _mock_extract(self, text: str, country_code: str) -> Dict[str, Any]:
         text_lower = (text or "").lower()
@@ -308,6 +307,8 @@ class GeminiExtractionAdapter:
         """
         if self.use_mock:
             return self._mock_extract(text, country_code), "mock"
+        if self._model is None:
+            return self._safe_fallback(text, "provider_unavailable"), "failed_fallback"
 
         country_pack = COUNTRY_PACKS.get(country_code, COUNTRY_PACKS["IN"])
         taxonomy = country_pack["taxonomy"]

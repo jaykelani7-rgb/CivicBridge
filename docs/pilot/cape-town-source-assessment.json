@@ -1,0 +1,57 @@
+{
+  "pilot_id": "cape_town_ward_15_water_2026",
+  "target_geography_id": "ZA-WC-CPT-W15",
+  "target_geography_level": "ward",
+  "target_boundary_version": "unverified_demo_boundary",
+  "target_reference_year": 2026,
+  "sources": [
+    {
+      "source_id": "za.cct.census2022.metro",
+      "kind": "demographic",
+      "publisher": "City of Cape Town, using Statistics South Africa Census 2022",
+      "title": "Cape Town census and population statistics",
+      "url": "https://www.capetown.gov.za/Work%20and%20business/Education-and-research-materials/Data-statistics-and-research/Cape-Town-census",
+      "retrieved_at": "2026-09-30",
+      "reference_year": 2022,
+      "geography_level": "city",
+      "boundary_version": null,
+      "dataset_version": "Census 2022 high-level profile",
+      "transformation": "No transformation or ward allocation has been performed.",
+      "reuse_terms": "City website terms reserve copyright; confirm dataset-specific permission before redistribution.",
+      "asset_file": "census2022_ward15.csv",
+      "reuse_cleared": false
+    },
+    {
+      "source_id": "za.cct.household2024.water",
+      "kind": "infrastructure",
+      "publisher": "City of Cape Town",
+      "title": "2024 City of Cape Town Household Survey: access to piped water",
+      "url": "https://household-survey.capetown.gov.za/",
+      "retrieved_at": "2026-09-30",
+      "reference_year": 2024,
+      "geography_level": "suburb",
+      "boundary_version": null,
+      "dataset_version": "2024 household survey",
+      "transformation": "No suburb-to-ward crosswalk or survey uncertainty mapping has been validated.",
+      "reuse_terms": "Survey download terms were not established; review with publisher before import.",
+      "asset_file": "household2024_ward15.csv",
+      "reuse_cleared": false
+    },
+    {
+      "source_id": "za.cct.budget2025.ward",
+      "kind": "investment",
+      "publisher": "City of Cape Town",
+      "title": "2025/26 to 2027/28 Budget, Annexure A: ward allocations",
+      "url": "https://resource.capetown.gov.za/documentcentre/Documents/Financial%20documents/Budget2526_AnnexureA.pdf",
+      "retrieved_at": "2026-09-30",
+      "reference_year": 2026,
+      "geography_level": "ward",
+      "boundary_version": null,
+      "dataset_version": "26 June 2025 budget",
+      "transformation": "Ward allocations are plan context; no Ward 15 water project row has been extracted or matched.",
+      "reuse_terms": "City website terms reserve copyright; confirm reuse permission before redistribution.",
+      "asset_file": "budget2025_ward15.csv",
+      "reuse_cleared": false
+    }
+  ]
+}

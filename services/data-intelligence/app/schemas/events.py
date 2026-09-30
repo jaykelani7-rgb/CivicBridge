@@ -137,6 +137,7 @@ class NormalizedRequestEvent(EventEnvelope[NormalizedRequest]):
 class HotspotUpdatedData(BaseModel):
     model_config = ConfigDict(extra="forbid")
     hotspot_id: UUID
+    request_ids: list[str] = Field(default_factory=list, description="Internal member IDs for citizen status propagation")
     country_code: str
     geography_id: str
     category: str

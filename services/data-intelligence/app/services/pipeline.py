@@ -133,7 +133,7 @@ class IntelligencePipeline:
                         "occurred_at":self._iso(envelope.occurred_at),"created_at":utc_now(),
                     })
                     high = next((x for x in candidates if x.suggested_action == "auto_attach"),None)
-                    if high and geography.confidence >= 0.75:
+                    if high and geography.confidence >= 0.75 and not similarity.degraded:
                         cluster_id, assignment = high.candidate_cluster_id, "existing_cluster"
                         self.metrics.increment("high_confidence_cluster_assignments")
                     else:
@@ -266,7 +266,7 @@ class IntelligencePipeline:
             self.repository.save_hotspot_version(hotspot_id,version,snapshot,reason,idempotency_key,trace_id,now)
         with self.stage("publish_hotspot_event",context):
             event_id = str(uuid5(NAMESPACE_URL,f"hotspot.updated.v1:{hotspot_id}:{version}"))
-            data = HotspotUpdatedData(hotspot_id=hotspot_id,country_code=cluster["country_code"],geography_id=cluster["geography_id"],
+            data = HotspotUpdatedData(hotspot_id=hotspot_id,request_ids=[str(member["request_id"]) for member in members],country_code=cluster["country_code"],geography_id=cluster["geography_id"],
                 category=cluster["category"],request_count=len(members),unique_request_count=len(members),affected_population=population,
                 trend_30d=trend_30d,need_score=score.need_score,action_score=score.action_score,evidence_confidence=score.evidence_confidence,
                 score_version=score.version,evidence_bundle_id=bundle_id,calculated_at=datetime.fromisoformat(now.replace("Z","+00:00")))

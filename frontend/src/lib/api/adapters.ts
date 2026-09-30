@@ -55,13 +55,13 @@ export function evidenceUsesDemoData(bundle: EvidenceBundleDto): boolean {
 }
 
 export function adaptRecommendation(item: Recommendation): RecommendationViewModel {
-  return { id: item.recommendation_id, hotspotId: item.hotspot_id, title: item.title, status: item.status, confidencePercent: Math.round(item.confidence * 100), evidenceCount: item.supporting_evidence_ids.length, humanApproved: item.human_approved };
+  return { id: item.recommendation_id, hotspotId: item.hotspot_id, title: item.title, status: item.status, confidencePercent: item.confidence == null ? null : Math.round(item.confidence * 100), evidenceCount: item.supporting_evidence_ids.length, humanApproved: item.human_approved };
 }
 
 export function adaptProjectMetric(item: ImpactMetric): ProjectMetricViewModel {
-  const span = item.target - item.baseline;
-  const progress = span === 0 ? null : Math.max(0, Math.min(100, Math.round(((item.current - item.baseline) / span) * 100)));
-  return { id: item.metric_id, code: item.metric_code, baseline: item.baseline, target: item.target, current: item.current, unit: item.unit, progressPercent: progress, sourceId: item.source_id, confidencePercent: Math.round(item.confidence * 100) };
+  const span = item.target == null || item.baseline == null ? null : item.target - item.baseline;
+  const progress = span == null || span === 0 || item.current == null || item.baseline == null ? null : Math.max(0, Math.min(100, Math.round(((item.current - item.baseline) / span) * 100)));
+  return { id: item.metric_id, code: item.metric_code, baseline: item.baseline, target: item.target, current: item.current, unit: item.unit, progressPercent: progress, sourceId: item.source_id, confidencePercent: item.confidence == null ? null : Math.round(item.confidence * 100) };
 }
 
 export function demoModeEnabled(value = process.env.NEXT_PUBLIC_DEMO_MODE): boolean { return value === "true"; }

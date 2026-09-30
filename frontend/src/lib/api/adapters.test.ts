@@ -24,6 +24,7 @@ describe("contract adapters", () => {
   it("adapts recommendations and real project metrics", () => {
     const recommendation = recommendationSchema.parse({ recommendation_id: "r", hotspot_id: "h", evidence_bundle_id: "e", title: "Drainage assessment", problem: "Flooding", proposed_intervention: "Survey", intended_beneficiaries: 0, supporting_evidence_ids: ["s1"], risks: [], missing_information: [], confidence: .81, status: "under_review", ai_draft: true, human_approved: false, assigned_department: null, assigned_reviewer: null, created_at: "2026-08-22", updated_at: "2026-08-22", schema_version: "recommendation-1.0.0" });
     expect(adaptRecommendation(recommendation)).toMatchObject({ confidencePercent: 81, evidenceCount: 1 });
+    expect(adaptRecommendation(recommendationSchema.parse({ ...recommendation, intended_beneficiaries: null, confidence: null })).confidencePercent).toBeNull();
     const metric = metricSchema.parse({ metric_id: "m", project_id: "p", metric_code: "access", baseline: 10, target: 20, current: 15, unit: "percent", source_id: "source", measured_at: "2026-08-22", confidence: .9, outcome_status: "improving", recorded_at: "2026-08-22", schema_version: "impact-metric-1.0.0" });
     expect(adaptProjectMetric(metric)).toMatchObject({ progressPercent: 50, confidencePercent: 90 });
   });

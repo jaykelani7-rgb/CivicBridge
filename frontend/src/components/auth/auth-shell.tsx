@@ -13,9 +13,10 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { authApi, authKeys, type SafeStaffProfile } from "@/lib/api/auth";
+import { authApi, authKeys } from "@/lib/api/auth";
 import { isApiError } from "@/lib/api/errors";
 import { browserFirebaseAuth, runtimeFirebaseConfig } from "@/lib/firebase/client";
+import { allowedStaffDestination } from "@/lib/navigation/staff-return";
 
 type AuthShellProps = { returnTo?: string; reason?: string };
 const reasonCopy: Record<string, { title: string; message: string }> = {
@@ -25,14 +26,6 @@ const reasonCopy: Record<string, { title: string; message: string }> = {
   permission_denied: { title: "Permission denied", message: "Your verified account does not have the role required for that workspace." },
   signed_out: { title: "Signed out", message: "Your server session was cleared and revoked." },
 };
-
-function defaultWorkspace(user: SafeStaffProfile): string { return user.role === "analyst" ? "/command-center" : "/csr-impact"; }
-function allowedDestination(user: SafeStaffProfile, returnTo?: string): string {
-  if (!returnTo) return defaultWorkspace(user);
-  if (returnTo.startsWith("/command-center") && ["analyst", "policymaker", "admin"].includes(user.role)) return returnTo;
-  if (returnTo.startsWith("/csr-impact") && ["policymaker", "admin", "csr_partner"].includes(user.role)) return returnTo;
-  return defaultWorkspace(user);
-}
 
 export function AuthShell({ returnTo, reason }: AuthShellProps) {
   const router = useRouter();
@@ -58,12 +51,12 @@ export function AuthShell({ returnTo, reason }: AuthShellProps) {
       const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: "select_account" });
       return exchangeCredential((await signInWithPopup(auth, provider)).user);
     },
-    onSuccess: ({ user }) => { queryClient.setQueryData(authKeys.me, { user }); toast.success("Secure staff session created."); router.replace(allowedDestination(user, returnTo)); router.refresh(); },
+    onSuccess: ({ user }) => { queryClient.setQueryData(authKeys.me, { user }); toast.success("Secure staff session created."); router.replace(allowedStaffDestination(user, returnTo)); router.refresh(); },
     onError: (error) => toast.error(isApiError(error) ? error.message : error.message || "Google sign-in could not be completed."),
   });
   const emailMutation = useMutation({
     mutationFn: async () => { const auth = await browserFirebaseAuth(); return exchangeCredential((await signInWithEmailAndPassword(auth, email, password)).user); },
-    onSuccess: ({ user }) => { setPassword(""); queryClient.setQueryData(authKeys.me, { user }); toast.success("Secure staff session created."); router.replace(allowedDestination(user, returnTo)); router.refresh(); },
+    onSuccess: ({ user }) => { setPassword(""); queryClient.setQueryData(authKeys.me, { user }); toast.success("Secure staff session created."); router.replace(allowedStaffDestination(user, returnTo)); router.refresh(); },
     onError: (error) => { setPassword(""); toast.error(isApiError(error) ? error.message : "Email sign-in failed. Check the account and try again."); },
   });
   const logoutMutation = useMutation({
@@ -79,7 +72,7 @@ export function AuthShell({ returnTo, reason }: AuthShellProps) {
 
   return <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-5 py-10"><Card className="w-full overflow-hidden"><CardHeader className="space-y-4 bg-muted/40"><Badge variant={existingUser ? "success" : "accent"} className="w-fit">{existingUser ? "Verified staff session" : "Secure staff access"}</Badge><div className={`flex h-14 w-14 items-center justify-center rounded-full ${existingUser ? "bg-success/15 text-success" : "bg-accent/15 text-accent"}`}>{existingUser ? <CheckCircle2 className="h-6 w-6"/> : <KeyRound className="h-6 w-6"/>}</div><h1 className="font-heading text-4xl font-normal">{existingUser ? "You are signed in securely." : "Secure staff access"}</h1><CardDescription>{existingUser ? "Your verified role controls the workspaces available to this session." : "Sign in with your verified organizational account. Roles are assigned by an authorized administrator, never selected here."}</CardDescription></CardHeader><CardContent className="space-y-5 p-6">
     {message ? <StatusNotice title={message.title} message={message.message} warning={reason !== "signed_out"}/> : null}
-    {session.isLoading ? <div aria-live="polite" className="space-y-3"><Skeleton className="h-5 w-40"/><Skeleton className="h-24"/></div> : existingUser ? <div className="space-y-4 rounded-2xl border border-success/25 bg-success/5 p-5"><div><p className="font-semibold">{existingUser.displayName ?? existingUser.email ?? "CivicBridge staff member"}</p><p className="mt-1 text-sm text-muted-foreground">Role: {existingUser.role.replaceAll("_", " ")}</p></div><div className="flex flex-wrap gap-3"><Button onClick={() => router.push(allowedDestination(existingUser, returnTo))}>Continue to workspace</Button><Button variant="outline" disabled={logoutMutation.isPending} onClick={() => logoutMutation.mutate()}>{logoutMutation.isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : <LogOut className="mr-2 h-4 w-4"/>}Sign out</Button></div></div> : <>
+    {session.isLoading ? <div aria-live="polite" className="space-y-3"><Skeleton className="h-5 w-40"/><Skeleton className="h-24"/></div> : existingUser ? <div className="space-y-4 rounded-2xl border border-success/25 bg-success/5 p-5"><div><p className="font-semibold">{existingUser.displayName ?? existingUser.email ?? "CivicBridge staff member"}</p><p className="mt-1 text-sm text-muted-foreground">Role: {existingUser.role.replaceAll("_", " ")}</p></div><div className="flex flex-wrap gap-3"><Button onClick={() => router.push(allowedStaffDestination(existingUser, returnTo))}>Continue to workspace</Button><Button variant="outline" disabled={logoutMutation.isPending} onClick={() => logoutMutation.mutate()}>{logoutMutation.isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : <LogOut className="mr-2 h-4 w-4"/>}Sign out</Button></div></div> : <>
       {denied ? <StatusNotice title="Permission denied" message={sessionError.message} warning/> : invalid && !message ? <StatusNotice title="Session unavailable" message={sessionError.message} warning/> : null}
       {firebaseConfig.isLoading ? <div aria-label="Loading sign-in configuration" className="space-y-3"><Skeleton className="h-11 w-full"/><Skeleton className="h-5 w-2/3"/></div> : firebaseConfig.isError ? <StatusNotice title="Authentication configuration error" message="Staff sign-in is not configured correctly. Please contact a CivicBridge administrator." warning/> : <div className="space-y-4"><Button className="w-full" size="lg" disabled={pending} onClick={() => googleMutation.mutate()}>{googleMutation.isPending ? <LoaderCircle className="mr-2 h-5 w-5 animate-spin"/> : <LogIn className="mr-2 h-5 w-5"/>}Continue with Google</Button>
         {emailEnabled ? <div className="space-y-4 border-t border-border pt-4"><p className="text-sm font-semibold">Email and password</p><div className="space-y-2"><Label htmlFor="staff-email">Email</Label><Input id="staff-email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)}/></div><div className="space-y-2"><Label htmlFor="staff-password">Password</Label><Input id="staff-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)}/></div><Button variant="outline" className="w-full" disabled={pending || !email || !password} onClick={() => emailMutation.mutate()}>{emailMutation.isPending ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin"/> : null}Sign in with email</Button></div> : null}

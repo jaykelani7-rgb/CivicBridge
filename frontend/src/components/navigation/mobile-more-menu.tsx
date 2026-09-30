@@ -15,7 +15,7 @@ export function MobileMoreMenu() {
   const { locale, setLocale } = usePublicLocale();
   const session = useQuery({ queryKey: authKeys.me, queryFn: authApi.me, retry: false, staleTime: 60_000 });
   const user = session.data?.user;
-  const logout = useMutation({ mutationFn: authApi.logout, onSuccess: async () => { queryClient.removeQueries({ queryKey: ["auth"] }); router.replace("/"); router.refresh(); } });
+  const logout = useMutation({ mutationFn: authApi.logout, onSuccess: async () => { queryClient.removeQueries({ queryKey: ["auth"] }); router.replace("/auth?reason=signed_out"); router.refresh(); } });
   return <main id="main-content" className="mx-auto min-h-screen max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
     <p className="text-sm font-black uppercase tracking-[0.16em] text-[#004E72]">CivicBridge settings</p><h1 className="mt-3 font-heading text-[clamp(2.25rem,9vw,4rem)] font-black leading-none text-[#092634]">More</h1>
     {user ? <Card className="mt-7"><CardHeader><CardTitle className="flex items-center gap-2"><UserRound className="h-5 w-5"/>Staff profile</CardTitle><CardDescription>{user.displayName ?? user.email ?? "Verified CivicBridge staff member"}</CardDescription></CardHeader><CardContent><div className="flex items-center justify-between gap-4 rounded-xl bg-muted/40 p-4"><span className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-5 w-5 text-[#004E72]"/>Verified role</span><span className="capitalize">{user.role.replace("_", " ")}</span></div></CardContent></Card> : null}

@@ -19,6 +19,15 @@ from services.policy_impact.app.config import settings
 logger = logging.getLogger("recommendation-service")
 
 
+def _source_finding(source_id: str, bundle: dict) -> Optional[str]:
+    findings = []
+    for section, fields in (("demographic_features", ("population", "equity_vulnerability")), ("infrastructure_gap_records", ("infrastructure_gap", "existing_facility_coverage")), ("investment_plan_records", ("strategic_alignment", "delivery_readiness", "existing_coverage_penalty"))):
+        for record in bundle.get(section, []):
+            if record.get("source_id") == source_id:
+                findings.extend(f"{name.replace('_', ' ')}: {record[name]}" for name in fields if record.get(name) is not None)
+    return "; ".join(findings) if findings else None
+
+
 class RecommendationService:
     def __init__(
         self,
@@ -47,6 +56,10 @@ class RecommendationService:
         if not evidence_bundle:
             raise ValueError(f"Evidence bundle {req.evidence_bundle_id} for hotspot {req.hotspot_id} not found.")
 
+        bundle_hotspot = evidence_bundle.get("hotspot_id") or (evidence_bundle.get("hotspot_snapshot") or {}).get("hotspot_id")
+        if bundle_hotspot != req.hotspot_id or evidence_bundle.get("evidence_bundle_id") != req.evidence_bundle_id:
+            raise ValueError("Evidence bundle identity does not match the requested hotspot and version.")
+
         valid_evidence_ids = evidence_bundle.get("valid_evidence_ids", [])
 
         # 2. Obtain draft (either from AI or manual fields)
@@ -65,22 +78,39 @@ class RecommendationService:
         if not val_result.is_valid:
             logger.error(f"[RecommendationService] Grounding validation failed: {val_result.message}")
             raise ValueError(f"Grounding validation error: {val_result.message}")
+        claim_traces = EvidenceValidator.require_supported_numbers(draft, evidence_bundle)
 
         # 4. Construct Recommendation entity
         rec = Recommendation(
             recommendation_id=str(uuid4()),
             hotspot_id=req.hotspot_id,
             evidence_bundle_id=req.evidence_bundle_id,
+            quantitative_claims=claim_traces,
+            country_code=(evidence_bundle.get("hotspot_snapshot") or {}).get("country_code"),
+            category=(evidence_bundle.get("hotspot_snapshot") or {}).get("category"),
+            evidence_sources=[{
+                "source_id": source.get("source_id", ""),
+                "title": source.get("title") or source.get("dataset_name"),
+                "publisher": source.get("publisher"),
+                "url": source.get("url") or source.get("source_url"),
+                "reference_period": source.get("reference_period") or source.get("time_coverage"),
+                "retrieved_at": source.get("retrieved_at"),
+                "finding": source.get("finding") or _source_finding(source.get("source_id", ""), evidence_bundle),
+                "provenance": "synthetic_demo" if source.get("synthetic") else source.get("classification") or evidence_bundle.get("provenance"),
+            } for source in evidence_bundle.get("data_sources", []) if source.get("source_id") in supporting_ids],
             title=title,
             problem=draft.get("problem", "Recurring infrastructure access issue."),
             proposed_intervention=draft.get("proposed_intervention", "Conduct feasibility study for capacity upgrade."),
-            intended_beneficiaries=draft.get("intended_beneficiaries", 10000),
+            intended_beneficiaries=draft.get("intended_beneficiaries"),
             supporting_evidence_ids=supporting_ids,
             risks=draft.get("risks", []),
             missing_information=draft.get("missing_information", []),
-            confidence=draft.get("confidence", 0.85),
+            confidence=draft.get("confidence"),
             status=RecommendationStatus.UNDER_REVIEW,
             ai_draft=ai_draft,
+            processing_mode="manual" if not ai_draft else draft.get("processing_mode", "unknown"),
+            draft_provider=None if not ai_draft else draft.get("provider"),
+            draft_model=None if not ai_draft else draft.get("model"),
             human_approved=False,
             created_at=now_str,
             updated_at=now_str,

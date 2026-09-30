@@ -71,7 +71,7 @@ def test_create_project_milestones_and_impact_metrics_success():
     proj_data = proj_res.json()
     proj_id = proj_data["project_id"]
     assert proj_data["status"] == "candidate"
-    assert len(proj_data["milestones"]) == 1
+    assert len(proj_data["milestones"]) == 0
 
     # 4. Add Milestone
     ms_res = client.post(

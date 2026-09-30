@@ -81,5 +81,5 @@ export type HotspotPage = {
   pagination: { page: number; pageSize: number; total: number; pages: number };
 };
 
-export type RecommendationViewModel = { id: string; hotspotId: string; title: string; status: string; confidencePercent: number; evidenceCount: number; humanApproved: boolean };
-export type ProjectMetricViewModel = { id: string; code: string; baseline: number; target: number; current: number; unit: string; progressPercent: number | null; sourceId: string; confidencePercent: number };
+export type RecommendationViewModel = { id: string; hotspotId: string; title: string; status: string; confidencePercent: number | null; evidenceCount: number; humanApproved: boolean };
+export type ProjectMetricViewModel = { id: string; code: string; baseline: number | null | undefined; target: number | null | undefined; current: number | null | undefined; unit: string; progressPercent: number | null; sourceId: string; confidencePercent: number | null };

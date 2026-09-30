@@ -12,11 +12,8 @@ from typing import Optional, Tuple
 
 logger = logging.getLogger("ai-normalization.speech")
 
-# Representative canned transcripts for the pilot languages, used only in mock
-# mode. Real audio bytes are not available cross-process in the hackathon demo
-# (Sujal's service stores media privately); production would add an
-# authenticated internal media-bytes endpoint on Citizen Channels for this
-# adapter to call before invoking Speech-to-Text V2.
+# Representative canned transcripts for explicit mock mode only. They are never
+# presented as live transcription and never used after a live-provider failure.
 MOCK_TRANSCRIPTS = {
     "hi": "हमारे गाँव में पीने का साफ़ पानी नहीं आ रहा है, कृपया मदद करें।",
     "pt": "A rua principal está cheia de buracos e sem iluminação pública.",
@@ -38,8 +35,7 @@ class SpeechToTextAdapter:
 
                 self._client = speech_v2.SpeechClient()
             except Exception as exc:
-                logger.warning("Failed to initialize Cloud Speech-to-Text V2 client: %s. Falling back to mock.", exc)
-                self.use_mock = True
+                logger.error("Failed to initialize Cloud Speech-to-Text V2 client: %s", exc)
 
     def transcribe(
         self,
@@ -57,30 +53,29 @@ class SpeechToTextAdapter:
           "failed"            -- transcription attempted but failed (contract:
                                   preserve audio, allow text fallback / retry)
         """
-        if fallback_text:
-            return fallback_text, "skipped_no_audio"
-
         if not media_ref:
-            return "", "skipped_no_audio"
+            return fallback_text or "", "skipped_no_audio"
 
         short_lang = (language_code or "en").split("-")[0].lower()
 
         if self.use_mock:
-            return MOCK_TRANSCRIPTS.get(short_lang, "Citizen voice request could not be matched to a mock transcript."), "ok"
+            transcript = MOCK_TRANSCRIPTS.get(short_lang)
+            return (transcript, "mock") if transcript else ("", "failed")
 
         try:
             recognizer = f"projects/{self.project_id}/locations/{self.location}/recognizers/_"
             config = {
                 "auto_decoding_config": {},
                 "language_codes": [language_code],
-                "model": "telephony",
+                "model": "long",
             }
             if audio_content is None:
                 logger.warning("No audio bytes available for %s; cannot call Speech-to-Text V2.", media_ref)
                 return "", "failed"
             response = self._client.recognize(recognizer=recognizer, config=config, content=audio_content)
             if response.results:
-                return response.results[0].alternatives[0].transcript, "ok"
+                transcript = " ".join(result.alternatives[0].transcript for result in response.results if result.alternatives).strip()
+                return (transcript, "ok") if transcript else ("", "failed")
             return "", "failed"
         except Exception as exc:
             logger.error("Cloud Speech-to-Text V2 transcription failed: %s", exc)

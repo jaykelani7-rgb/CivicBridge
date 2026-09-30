@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 from packages.contracts import (
@@ -15,10 +16,13 @@ logger = logging.getLogger("policy-impact-db")
 
 
 class PolicyImpactRepository:
-    def __init__(self, db_path: str = "data/policy_impact.db"):
-        self.db_path = db_path
-        if db_path != ":memory:":
-            Path(db_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path or os.getenv("POLICY_DATABASE_URL") or os.getenv("DATABASE_PATH", "data/policy_impact.db")
+        self._postgres = self.db_path.startswith(("postgres://", "postgresql://"))
+        if os.getenv("ENVIRONMENT", "development").lower() == "production" and not self._postgres:
+            raise RuntimeError("Production policy storage requires POLICY_DATABASE_URL (PostgreSQL)")
+        if not self._postgres and self.db_path != ":memory:":
+            Path(self.db_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
         self._in_memory_recommendations: Dict[str, dict] = {}
         self._in_memory_decisions: Dict[str, dict] = {}
         self._in_memory_projects: Dict[str, dict] = {}
@@ -26,15 +30,25 @@ class PolicyImpactRepository:
         self._in_memory_metrics: Dict[str, List[dict]] = {}
         self._init_db()
 
+    def _connect(self):
+        if self._postgres:
+            import psycopg
+            return psycopg.connect(self.db_path)
+        return sqlite3.connect(self.db_path, timeout=30)
+
+    def _query(self, query: str) -> str:
+        return query.replace("?", "%s") if self._postgres else query
+
     def _execute_write(self, query: str, params: tuple):
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._connect()
             cursor = conn.cursor()
-            cursor.execute(query, params)
+            cursor.execute(self._query(query), params)
             conn.commit()
         except Exception as e:
-            logger.warning(f"SQLite write error: {e}")
+            logger.exception("Policy database write failed")
+            raise
         finally:
             if conn:
                 conn.close()
@@ -42,14 +56,14 @@ class PolicyImpactRepository:
     def _execute_read_one(self, query: str, params: tuple) -> Optional[tuple]:
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._connect()
             cursor = conn.cursor()
-            cursor.execute(query, params)
+            cursor.execute(self._query(query), params)
             row = cursor.fetchone()
             return row
         except Exception as e:
-            logger.warning(f"SQLite read error: {e}")
-            return None
+            logger.exception("Policy database read failed")
+            raise
         finally:
             if conn:
                 conn.close()
@@ -57,13 +71,13 @@ class PolicyImpactRepository:
     def _execute_read_all(self, query: str, params: tuple = ()) -> List[tuple]:
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._connect()
             cursor = conn.cursor()
-            cursor.execute(query, params)
+            cursor.execute(self._query(query), params)
             return cursor.fetchall()
         except Exception as e:
-            logger.warning(f"SQLite read error: {e}")
-            return []
+            logger.exception("Policy database read failed")
+            raise
         finally:
             if conn:
                 conn.close()
@@ -71,7 +85,7 @@ class PolicyImpactRepository:
     def _init_db(self):
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._connect()
             cursor = conn.cursor()
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS recommendations (
@@ -128,7 +142,8 @@ class PolicyImpactRepository:
             conn.commit()
             logger.info("Database initialized successfully.")
         except Exception as e:
-            logger.warning(f"Failed to initialize SQLite database ({e}). Using in-memory store.")
+            logger.exception("Policy database initialization failed")
+            raise
         finally:
             if conn:
                 conn.close()
@@ -136,7 +151,6 @@ class PolicyImpactRepository:
     # --- Recommendations ---
     def save_recommendation(self, recommendation: Recommendation) -> Recommendation:
         data_dict = recommendation.model_dump()
-        self._in_memory_recommendations[recommendation.recommendation_id] = data_dict
         query = """
             INSERT INTO recommendations (recommendation_id, hotspot_id, evidence_bundle_id, title, data_json, status, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -156,12 +170,10 @@ class PolicyImpactRepository:
             recommendation.updated_at,
         )
         self._execute_write(query, params)
+        self._in_memory_recommendations[recommendation.recommendation_id] = data_dict
         return recommendation
 
     def get_recommendation(self, recommendation_id: str) -> Optional[Recommendation]:
-        if recommendation_id in self._in_memory_recommendations:
-            return Recommendation(**self._in_memory_recommendations[recommendation_id])
-        
         row = self._execute_read_one(
             "SELECT data_json FROM recommendations WHERE recommendation_id = ?",
             (recommendation_id,),
@@ -173,11 +185,9 @@ class PolicyImpactRepository:
         return None
 
     def list_recommendations(self, hotspot_id: Optional[str] = None, status: Optional[str] = None) -> List[Recommendation]:
-        for row in self._execute_read_all("SELECT data_json FROM recommendations"):
-            data = json.loads(row[0])
-            self._in_memory_recommendations.setdefault(data["recommendation_id"], data)
         results = []
-        for rec in self._in_memory_recommendations.values():
+        for row in self._execute_read_all("SELECT data_json FROM recommendations"):
+            rec = json.loads(row[0])
             if hotspot_id and rec.get("hotspot_id") != hotspot_id:
                 continue
             if status and rec.get("status") != status:
@@ -188,7 +198,6 @@ class PolicyImpactRepository:
     # --- Policy Decisions ---
     def save_decision(self, decision: PolicyDecision) -> PolicyDecision:
         data_dict = decision.model_dump()
-        self._in_memory_decisions[decision.decision_id] = data_dict
         query = """
             INSERT INTO policy_decisions (decision_id, recommendation_id, action, actor_id, data_json, decided_at)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -202,25 +211,18 @@ class PolicyImpactRepository:
             decision.decided_at,
         )
         self._execute_write(query, params)
+        self._in_memory_decisions[decision.decision_id] = data_dict
         return decision
 
     def list_decisions_for_recommendation(self, recommendation_id: str) -> List[PolicyDecision]:
-        for row in self._execute_read_all(
+        return [PolicyDecision(**json.loads(row[0])) for row in self._execute_read_all(
             "SELECT data_json FROM policy_decisions WHERE recommendation_id = ?",
             (recommendation_id,),
-        ):
-            data = json.loads(row[0])
-            self._in_memory_decisions.setdefault(data["decision_id"], data)
-        return [
-            PolicyDecision(**d)
-            for d in self._in_memory_decisions.values()
-            if d.get("recommendation_id") == recommendation_id
-        ]
+        )]
 
     # --- Projects ---
     def save_project(self, project: Project) -> Project:
         data_dict = project.model_dump()
-        self._in_memory_projects[project.project_id] = data_dict
         query = """
             INSERT INTO projects (project_id, recommendation_id, hotspot_id, title, status, data_json, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -240,12 +242,10 @@ class PolicyImpactRepository:
             project.updated_at,
         )
         self._execute_write(query, params)
+        self._in_memory_projects[project.project_id] = data_dict
         return project
 
     def get_project(self, project_id: str) -> Optional[Project]:
-        if project_id in self._in_memory_projects:
-            return Project(**self._in_memory_projects[project_id])
-        
         row = self._execute_read_one(
             "SELECT data_json FROM projects WHERE project_id = ?",
             (project_id,),
@@ -257,11 +257,9 @@ class PolicyImpactRepository:
         return None
 
     def list_projects(self, status: Optional[str] = None) -> List[Project]:
-        for row in self._execute_read_all("SELECT data_json FROM projects"):
-            data = json.loads(row[0])
-            self._in_memory_projects.setdefault(data["project_id"], data)
         results = []
-        for proj in self._in_memory_projects.values():
+        for row in self._execute_read_all("SELECT data_json FROM projects"):
+            proj = json.loads(row[0])
             if status and proj.get("status") != status:
                 continue
             results.append(Project(**proj))
@@ -270,10 +268,6 @@ class PolicyImpactRepository:
     # --- Milestones & Metrics ---
     def add_milestone(self, milestone: Milestone) -> Milestone:
         data_dict = milestone.model_dump()
-        if milestone.project_id not in self._in_memory_milestones:
-            self._in_memory_milestones[milestone.project_id] = []
-        self._in_memory_milestones[milestone.project_id].append(data_dict)
-        
         query = """
             INSERT INTO milestones (milestone_id, project_id, title, status, data_json)
             VALUES (?, ?, ?, ?, ?)
@@ -286,22 +280,17 @@ class PolicyImpactRepository:
             json.dumps(data_dict),
         )
         self._execute_write(query, params)
+        self._in_memory_milestones.setdefault(milestone.project_id, []).append(data_dict)
         return milestone
 
     def get_milestones(self, project_id: str) -> List[Milestone]:
         persisted = [json.loads(row[0]) for row in self._execute_read_all(
             "SELECT data_json FROM milestones WHERE project_id = ?", (project_id,)
         )]
-        if persisted:
-            self._in_memory_milestones[project_id] = persisted
-        return [Milestone(**m) for m in self._in_memory_milestones.get(project_id, [])]
+        return [Milestone(**m) for m in persisted]
 
     def add_metric(self, metric: ImpactMetric) -> ImpactMetric:
         data_dict = metric.model_dump()
-        if metric.project_id not in self._in_memory_metrics:
-            self._in_memory_metrics[metric.project_id] = []
-        self._in_memory_metrics[metric.project_id].append(data_dict)
-        
         query = """
             INSERT INTO impact_metrics (metric_id, project_id, metric_code, data_json, recorded_at)
             VALUES (?, ?, ?, ?, ?)
@@ -314,15 +303,14 @@ class PolicyImpactRepository:
             metric.recorded_at,
         )
         self._execute_write(query, params)
+        self._in_memory_metrics.setdefault(metric.project_id, []).append(data_dict)
         return metric
 
     def get_metrics(self, project_id: str) -> List[ImpactMetric]:
         persisted = [json.loads(row[0]) for row in self._execute_read_all(
             "SELECT data_json FROM impact_metrics WHERE project_id = ?", (project_id,)
         )]
-        if persisted:
-            self._in_memory_metrics[project_id] = persisted
-        return [ImpactMetric(**m) for m in self._in_memory_metrics.get(project_id, [])]
+        return [ImpactMetric(**m) for m in persisted]
 
     def clear(self):
         self._in_memory_recommendations.clear()

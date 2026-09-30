@@ -31,8 +31,7 @@ class TranslationAdapter:
 
                 self._client = translate_v3.TranslationServiceClient()
             except Exception as exc:
-                logger.warning("Failed to initialize Cloud Translation Advanced client: %s. Falling back to mock.", exc)
-                self.use_mock = True
+                logger.error("Failed to initialize Cloud Translation Advanced client: %s", exc)
 
     def translate(self, text: str, source_lang: str, target_lang: str = "en") -> Tuple[str, str]:
         """
@@ -49,7 +48,7 @@ class TranslationAdapter:
         if self.use_mock:
             if text in MOCK_TRANSLATIONS:
                 return MOCK_TRANSLATIONS[text], "ok"
-            return f"[Translated from {source_lang}] {text}", "ok"
+            return text, "mock_untranslated"
 
         try:
             parent = f"projects/{self.project_id}/locations/{self.location}"
