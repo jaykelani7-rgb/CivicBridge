@@ -1,5 +1,7 @@
 # CivicBridge editorial redesign
 
+The subsequent local refinement review, checks and populated-component screenshots are in [refinements/README.md](refinements/README.md).
+
 Implemented for review on a separate branch. Branch publication was subsequently requested by the repository owner. No pull request, merge, or deployment is part of this change.
 
 ## Baseline and scope

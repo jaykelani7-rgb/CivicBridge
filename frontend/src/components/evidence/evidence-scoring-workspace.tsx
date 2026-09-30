@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const tabs = ["overview", "citizen", "score", "sources", "limitations", "methodology"] as const;
-type TabId = typeof tabs[number];
+export type TabId = typeof tabs[number];
 const tabLabels: Record<TabId, string> = { overview: "Overview", citizen: "Citizen Evidence", score: "Score Breakdown", sources: "Data Sources", limitations: "Limitations", methodology: "Methodology" };
 
 export function EvidenceScoringWorkspace({ hotspotId }: { hotspotId: string }) {
@@ -25,23 +25,10 @@ export function EvidenceScoringWorkspace({ hotspotId }: { hotspotId: string }) {
   const router = useRouter();
   const requestedTab = search.get("tab");
   const activeTab: TabId = tabs.includes(requestedTab as TabId) ? requestedTab as TabId : "overview";
-  const tabRefs = useRef(new Map<TabId, HTMLButtonElement>());
   const detail = useQuery({ queryKey: intelligenceKeys.detail(hotspotId), queryFn: () => intelligenceApi.detail(hotspotId) });
   const evidence = useQuery({ queryKey: intelligenceKeys.evidence(hotspotId), queryFn: () => intelligenceApi.evidence(hotspotId), retry: 1 });
   const score = useQuery({ queryKey: intelligenceKeys.score(hotspotId), queryFn: () => intelligenceApi.score(hotspotId), retry: 1 });
   const session = useQuery({ queryKey: authKeys.me, queryFn: authApi.me, staleTime: 60_000, retry: false });
-
-  function selectTab(tab: TabId, focus = false) {
-    router.replace(`?tab=${tab}`, { scroll: false });
-    if (focus) requestAnimationFrame(() => tabRefs.current.get(tab)?.focus());
-  }
-  function onTabKeyDown(event: React.KeyboardEvent, tab: TabId) {
-    const index = tabs.indexOf(tab);
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
-    event.preventDefault();
-    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
-    selectTab(tabs[next], true);
-  }
 
   if (session.isLoading || detail.isLoading || evidence.isLoading) return <Frame><Skeleton className="h-52"/><Skeleton className="mt-5 h-96"/></Frame>;
   if (session.isError || !session.data) return <Frame><ErrorState title="Authorized staff access required" error={session.error} retry={() => void session.refetch()} detail="A verified analyst, policymaker, or administrator session is required."/></Frame>;
@@ -53,24 +40,44 @@ export function EvidenceScoringWorkspace({ hotspotId }: { hotspotId: string }) {
   const role = session.data.user.role;
   const visibility = evidenceVisibilityForRole(role);
   if (!visibility.workspace) return <Frame><ErrorState title="Authorized staff access required" error={new Error("Role forbidden")} retry={() => void session.refetch()} detail="This role cannot access internal hotspot evidence."/></Frame>;
+  return <EvidenceScoringView hotspotId={hotspotId} bundle={bundle} hotspot={hotspot} activeTab={activeTab} onTabChange={tab=>router.replace(`?tab=${tab}`, { scroll: false })} scoreData={score.data} scoreError={score.isError} technical={visibility.technicalComponents} viewLabel={role?.replaceAll("_", " ")}/>;
+}
+
+export function EvidenceScoringView({ hotspotId, bundle, hotspot, activeTab, onTabChange, scoreData, scoreError, technical, viewLabel }: {
+  hotspotId: string; bundle: EvidenceBundleDto; hotspot: Awaited<ReturnType<typeof intelligenceApi.detail>>["hotspot"];
+  activeTab: TabId; onTabChange: (tab: TabId)=>void; scoreData?: Awaited<ReturnType<typeof intelligenceApi.score>>;
+  scoreError: boolean; technical: boolean; viewLabel?: string;
+}) {
+  const tabRefs = useRef(new Map<TabId, HTMLButtonElement>());
+  function selectTab(tab: TabId, focus = false) {
+    onTabChange(tab);
+    if (focus) requestAnimationFrame(() => tabRefs.current.get(tab)?.focus());
+  }
+  function onTabKeyDown(event: React.KeyboardEvent, tab: TabId) {
+    const index = tabs.indexOf(tab);
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    selectTab(tabs[next], true);
+  }
+
   const demo = evidenceUsesDemoData(bundle) || hotspot.provenance?.is_synthetic;
   const stale = isBundleStale(bundle.created_at);
-  const scoreData = score.data;
   return <Frame>
     <HeaderBack hotspotId={hotspotId}/>
     <header className="mt-5 rounded-3xl border border-foreground/12 bg-card p-5 shadow-[0_12px_30px_rgba(9,38,52,.06)] sm:p-7">
-      <div className="flex flex-wrap items-start justify-between gap-5"><div><div className="flex flex-wrap gap-2">{demo ? <Badge variant="warning">Demonstration data — not official statistics</Badge> : <Badge variant="success">Live source status</Badge>}<Badge variant="info">Formula {bundle.hotspot_snapshot.score_version}</Badge>{role ? <Badge variant="secondary">{role.replaceAll("_", " ")} view</Badge> : null}</div><h1 className="mt-4 text-3xl font-normal">Evidence &amp; Scoring</h1><p className="mt-2 text-lg font-bold">{bundle.hotspot_snapshot.category} · {bundle.geography.locality}, {bundle.geography.admin2}</p><p className="mt-1 text-sm text-muted-foreground">Calculated {formatDate(bundle.hotspot_snapshot.calculated_at)}</p></div><div className="grid min-w-[12rem] grid-cols-2 gap-2 rounded-2xl bg-primary p-4 text-primary-foreground"><div><span className="block text-xs">Action Score</span><strong className="text-3xl">{bundle.hotspot_snapshot.action_score.toFixed(1)}</strong></div><div><span className="block text-xs">Priority rank</span><strong className="text-sm">{bundle.priority?.rank ? `#${bundle.priority.rank} of ${bundle.priority.total_ranked}` : "Unavailable"}</strong></div><div className="col-span-2 border-t border-white/25 pt-2 text-sm">{confidenceLabel(bundle.hotspot_snapshot.evidence_confidence)}</div></div></div>
+      <div className="flex flex-wrap items-start justify-between gap-5"><div><div className="flex flex-wrap gap-2">{demo ? <Badge variant="warning">Demonstration data — not official statistics</Badge> : <Badge variant="success">Live source status</Badge>}<Badge variant="info">Formula {bundle.hotspot_snapshot.score_version}</Badge>{viewLabel ? <Badge variant="secondary">{viewLabel} view</Badge> : null}</div><h1 className="mt-4 text-3xl font-normal">Evidence &amp; Scoring</h1><p className="mt-2 text-lg font-bold">{bundle.hotspot_snapshot.category} · {bundle.geography.locality}, {bundle.geography.admin2}</p><p className="mt-1 text-sm text-muted-foreground">Calculated {formatDate(bundle.hotspot_snapshot.calculated_at)}</p></div><div className="grid w-full min-w-0 grid-cols-2 sm:w-auto sm:min-w-[12rem] gap-2 rounded-2xl bg-primary p-4 text-primary-foreground"><div><span className="block text-xs">Action Score</span><strong className="text-3xl">{bundle.hotspot_snapshot.action_score.toFixed(1)}</strong></div><div><span className="block text-xs">Priority rank</span><strong className="text-sm">{bundle.priority?.rank ? `#${bundle.priority.rank} of ${bundle.priority.total_ranked}` : "Unavailable"}</strong></div><div className="col-span-2 border-t border-white/25 pt-2 text-sm">{confidenceLabel(bundle.hotspot_snapshot.evidence_confidence)}</div></div></div>
       {demo ? <p role="status" className="mt-5 flex gap-2 rounded-xl border border-warning/35 bg-warning/8 p-3 text-sm font-bold"><AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0 text-warning"/>This result includes demonstration fixtures. It is not an official statistic or an approved decision.</p> : null}{stale ? <p role="status" className="mt-3 flex gap-2 rounded-xl border border-warning/35 bg-warning/8 p-3 text-sm font-bold"><AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0 text-warning"/>This evidence bundle is more than 30 days old. Verify recency before acting.</p> : null}
     </header>
 
-    <div className="sticky top-0 z-20 -mx-4 mt-5 border-y border-foreground/10 bg-background/95 px-4 py-2 backdrop-blur-sm sm:mx-0 sm:rounded-2xl sm:border">
+    <div className="evidence-tabs sticky z-20 -mx-4 mt-5 border-y border-foreground/10 bg-background/95 px-4 py-2 backdrop-blur-sm sm:mx-0 sm:rounded-2xl sm:border">
       <div role="tablist" aria-label="Evidence sections" className="flex overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">{tabs.map((tab) => <button key={tab} ref={(node) => { if (node) tabRefs.current.set(tab, node); }} id={`tab-${tab}`} role="tab" aria-selected={activeTab === tab} aria-controls={`panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onClick={() => selectTab(tab)} onKeyDown={(event) => onTabKeyDown(event, tab)} className={`min-h-11 shrink-0 rounded-lg px-4 text-sm font-bold ${activeTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-primary/8"}`}>{tabLabels[tab]}</button>)}</div>
     </div>
 
     <section id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`} tabIndex={0} className="mt-5 rounded-3xl border border-foreground/12 bg-card p-5 sm:p-7">
       {activeTab === "overview" ? <Overview bundle={bundle}/> : null}
       {activeTab === "citizen" ? <CitizenEvidence bundle={bundle}/> : null}
-      {activeTab === "score" ? <ScoreBreakdown bundle={bundle} score={scoreData} scoreError={score.isError} technical={visibility.technicalComponents}/> : null}
+      {activeTab === "score" ? <ScoreBreakdown bundle={bundle} score={scoreData} scoreError={scoreError} technical={technical}/> : null}
       {activeTab === "sources" ? <DataSources bundle={bundle}/> : null}
       {activeTab === "limitations" ? <Limitations bundle={bundle}/> : null}
       {activeTab === "methodology" ? <Methodology bundle={bundle} score={scoreData}/> : null}
@@ -101,7 +108,7 @@ function ScoreBreakdown({ bundle, score, scoreError, technical }: { bundle: Evid
   const max = Math.max(1, ...components.map((component) => Math.abs(component.weighted_contribution)));
   const reconciliation = score ? reconcileActionScore(score) : null;
   return <div><SectionHeading eyebrow="Auditable calculation" title="Score Breakdown"/><div className="mt-6 rounded-2xl bg-background p-5"><h3 className="font-normal">How to read the fields</h3><dl className="mt-3 grid gap-3 md:grid-cols-3"><Definition term="Weight">How strongly the configured methodology values a component.</Definition><Definition term="Confidence">How reliable or complete its underlying evidence is.</Definition><Definition term="Contribution">The component points added or removed at that scoring stage.</Definition></dl></div>
-    <div className="mt-7" aria-labelledby="contribution-chart-title"><h3 id="contribution-chart-title" className="text-xl font-normal">Contribution influence</h3><p className="mt-1 text-sm text-muted-foreground">Ordered by absolute contribution. Penalties are labelled in text and use a striped bar.</p><ol className="mt-4 space-y-4">{components.map((component) => <li key={component.name} className="grid gap-2 sm:grid-cols-[12rem_1fr_7rem] sm:items-center"><span className="font-bold">{componentCopy(component.name).label}</span><span aria-hidden="true" className="h-4 overflow-hidden rounded-full bg-foreground/8"><span className={`block h-full rounded-full ${isPenalty(component.name, component.weighted_contribution) ? "penalty-bar" : "bg-primary"}`} style={{ width: `${Math.max(2, Math.abs(component.weighted_contribution) / max * 100)}%` }}/></span><span className="text-sm font-bold">{contributionText(component.name, component.weighted_contribution)}</span></li>)}</ol></div>
+    <div className="mt-7" aria-labelledby="contribution-chart-title"><h3 id="contribution-chart-title" className="text-xl font-normal">Contribution influence</h3><p className="mt-1 text-sm text-muted-foreground">Ordered by absolute contribution. Penalties are labelled in text and use a striped bar.</p><ol className="mt-4 space-y-4">{components.map((component) => <li key={component.name} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,.7fr)] sm:items-center"><span className="font-bold">{componentCopy(component.name).label}</span><span aria-hidden="true" className="h-4 overflow-hidden rounded-full bg-foreground/8"><span className={`block h-full rounded-full ${isPenalty(component.name, component.weighted_contribution) ? "penalty-bar" : "bg-primary"}`} style={{ width: `${Math.max(2, Math.abs(component.weighted_contribution) / max * 100)}%` }}/></span><span className="text-sm font-bold">{contributionText(component.name, component.weighted_contribution)}</span></li>)}</ol></div>
     <div className="mt-8 space-y-4">{components.map((component) => <article key={component.name} className="rounded-2xl border border-foreground/12 p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-normal">{componentCopy(component.name).label}</h3><p className="text-sm font-bold text-primary">{influenceLabel(component.weighted_contribution)}</p></div><p className="font-normal">{contributionText(component.name, component.weighted_contribution)}</p></div><p className="mt-3 text-muted-foreground">{componentCopy(component.name).meaning}</p><div className="mt-4 flex flex-wrap gap-2"><Badge variant="secondary">{confidenceLabel(component.confidence)}</Badge>{component.missing || component.fallback_used != null ? <Badge variant="warning">Estimate used—verify before approval</Badge> : null}</div>{component.missing || component.fallback_used != null ? <p className="mt-3 text-sm">This component used a configured fallback because the expected source value was unavailable. Its confidence was reduced accordingly.</p> : null}{technical ? <details className="mt-4 rounded-xl bg-background p-3"><summary className="min-h-11 cursor-pointer py-2 font-bold"><ChevronDown className="mr-2 inline h-4 w-4"/>Technical details</summary><dl className="grid gap-2 pt-3 text-sm sm:grid-cols-2"><Technical term="Raw value" value={component.raw_value == null ? "Unavailable" : String(component.raw_value)}/><Technical term="Normalized value" value={String(component.normalized_value)}/><Technical term="Configured weight" value={String(component.weight)}/><Technical term="Weighted contribution" value={String(component.weighted_contribution)}/><Technical term="Confidence" value={`${(component.confidence * 100).toFixed(0)}%`}/><Technical term="Fallback status" value={component.missing || component.fallback_used != null ? `Used${component.fallback_used != null ? ` (${component.fallback_used})` : ""}` : "Not used"}/><Technical term="Source" value={component.source_ids.length ? component.source_ids.join(", ") : "Unavailable"}/><Technical term="Formula version" value={component.formula_version}/></dl></details> : <p className="mt-4 text-sm text-muted-foreground">Technical source identifiers are reserved for analyst and administrator views.</p>}</article>)}</div>
     {scoreError ? <Notice>The component list is available, but the current score endpoint could not be loaded for reconciliation.</Notice> : reconciliation && !reconciliation.supported ? <Notice>{reconciliation.formulaText} The backend Action Score remains authoritative.</Notice> : reconciliation && !reconciliation.withinTolerance ? <Notice>Component reconciliation differs from the authoritative backend Action Score by {reconciliation.difference?.toFixed(3)} points. No browser-side correction was applied.</Notice> : reconciliation ? <p className="mt-6 flex gap-2 rounded-xl bg-success/10 p-4"><CheckCircle2 className="h-5 w-5 text-success"/>The documented formula reconciles within 0.02 points of the authoritative backend score.</p> : null}
   </div>;
@@ -128,7 +135,7 @@ function Methodology({ bundle, score }: { bundle: EvidenceBundleDto; score?: Awa
     <dl className="mt-7 grid gap-3 md:grid-cols-2"><Definition term="Action Score">The backend’s bounded prioritization score for potential action.</Definition><Definition term="Need Score">The weighted backend aggregate of demand, infrastructure gap, severity, equity, population, trend, and evidence confidence.</Definition><Definition term="Weight">How strongly the configured methodology values a component.</Definition><Definition term="Confidence">How reliable or complete the underlying evidence is.</Definition><Definition term="Contribution">The points supplied by a component at its scoring stage.</Definition><Definition term="Penalty">A supported value that reduces the Action Score.</Definition><Definition term="Fallback">A configured estimate used when an expected source value is unavailable.</Definition><Definition term="Evidence bundle">The versioned, privacy-safe supporting record used for audit.</Definition></dl></div>;
 }
 
-function Frame({ children }: { children: React.ReactNode }) { return <main id="main-content" className="staff-workspace min-h-screen overflow-x-hidden bg-background px-4 py-6 pb-[max(7rem,env(safe-area-inset-bottom))] text-foreground sm:px-6 lg:px-8"><div className="mx-auto max-w-6xl">{children}</div></main>; }
+function Frame({ children }: { children: React.ReactNode }) { return <main id="main-content" className="staff-workspace min-h-screen bg-background px-4 py-6 pb-[max(7rem,env(safe-area-inset-bottom))] text-foreground sm:px-6 lg:px-8"><div className="mx-auto max-w-6xl">{children}</div></main>; }
 function HeaderBack({ hotspotId }: { hotspotId: string }) { return <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm"><Link className="font-bold text-primary hover:underline" href="/command-center#hotspots">Command Center</Link><span aria-hidden="true">/</span><Link className="font-bold text-primary hover:underline" href={`/command-center/hotspots/${encodeURIComponent(hotspotId)}`}>Hotspot detail</Link><span aria-hidden="true">/</span><span>Evidence &amp; Scoring</span></nav>; }
 function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) { return <div><p className="text-sm font-normal uppercase tracking-[.16em] text-primary">{eyebrow}</p><h2 className="mt-2 text-2xl font-normal sm:text-3xl">{title}</h2></div>; }
 function Question({ title, children }: { title: string; children: React.ReactNode }) { return <article className="rounded-2xl border border-foreground/12 p-5"><h3 className="font-normal">{title}</h3><p className="mt-2 text-muted-foreground">{children}</p></article>; }

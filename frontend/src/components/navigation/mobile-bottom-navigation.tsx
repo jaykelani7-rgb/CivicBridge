@@ -23,22 +23,25 @@ function useCurrentHash() {
   return hash;
 }
 
-export function useMobileKeyboardVisibility() {
-  const [visible, setVisible] = useState(false);
+export function useMobileKeyboardInset() {
+  const [inset, setInset] = useState(0);
   useEffect(() => {
     const viewport = window.visualViewport;
     const update = () => {
       const focused = document.activeElement;
       const acceptsText = focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement || focused instanceof HTMLSelectElement || (focused instanceof HTMLElement && focused.isContentEditable);
-      setVisible(Boolean(acceptsText && viewport && window.innerHeight - viewport.height > 150));
+      const covered = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+      setInset(acceptsText && covered > 150 ? covered : 0);
     };
     viewport?.addEventListener("resize", update);
     window.addEventListener("focusin", update);
     window.addEventListener("focusout", update);
     return () => { viewport?.removeEventListener("resize", update); window.removeEventListener("focusin", update); window.removeEventListener("focusout", update); };
   }, []);
-  return visible;
+  return inset;
 }
+
+export function useMobileKeyboardVisibility() { return useMobileKeyboardInset() > 0; }
 
 function useBlockingOverlayVisibility() {
   const [visible, setVisible] = useState(false);

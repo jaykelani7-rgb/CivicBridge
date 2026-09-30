@@ -5,6 +5,9 @@ type Translation = readonly [hindi: string, portuguese: string];
 // This catalog intentionally contains interface copy only. API evidence, citizen text,
 // recommendation content, place names, identifiers, and metrics are never translated here.
 const translations: Record<string, Translation> = {
+  "Upload an audio file": ["ऑडियो फ़ाइल अपलोड करें", "Enviar um arquivo de áudio"],
+  "Your report location starts empty. Browser location is used only with your permission.": ["रिपोर्ट का स्थान शुरू में खाली रहता है। ब्राउज़र का स्थान केवल आपकी अनुमति से लिया जाता है।", "O local do relato começa vazio. A localização do navegador só é usada com sua permissão."],
+  "Report audio preview": ["रिपोर्ट का ऑडियो सुनें", "Prévia do áudio do relato"],
   "What needs attention in your neighbourhood?": ["आपके मोहल्ले में किस बात पर ध्यान देना चाहिए?", "O que precisa de atenção no seu bairro?"],
   "Tell us in your own words. Add a place, review the details, and send when you’re ready.": ["अपने शब्दों में बताएँ। जगह जोड़ें, विवरण जाँचें और तैयार होने पर भेजें।", "Conte com suas palavras. Adicione o local, revise os detalhes e envie quando estiver pronto."],
   "What have you noticed?": ["आपने क्या देखा है?", "O que você percebeu?"],

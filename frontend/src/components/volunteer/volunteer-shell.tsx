@@ -3,9 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, ArrowRight, CheckCircle2, CircleAlert, Clipboard, FileAudio, LocateFixed, Mic, Pause, RefreshCcw, RotateCcw, Send, ShieldCheck, Upload } from "lucide-react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,8 @@ import { nextCitizenPollDelay } from "@/lib/api/polling";
 import { isApiError } from "@/lib/api/errors";
 import { adaptCitizenRequest } from "@/lib/api/adapters";
 import type { ApproximateLocation, CitizenStatus, CreateCitizenRequest } from "@/lib/api/types";
+import { usePublicLocale } from "@/components/providers/public-locale-provider";
+import { useMobileKeyboardInset } from "@/components/navigation/mobile-bottom-navigation";
 import { convertRecordedAudioToWav } from "@/lib/media/wav";
 
 const trackingKey = "civicbridge:request-id";
@@ -28,6 +29,10 @@ const languages = [{ value: "en-IN", label: "English (India)" }, { value: "hi-IN
 function stageLabel(value?: string) { return value ? value.replaceAll("_", " ") : "not submitted"; }
 
 export function VolunteerShell() {
+  const { t } = usePublicLocale();
+  const keyboardInset = useMobileKeyboardInset();
+  const [inputMode, setInputMode] = useState<"write" | "record">("write");
+  const [replacement, setReplacement] = useState<{ kind: "record" } | { kind: "file"; file: File } | null>(null);
   const searchParams = useSearchParams();
   const initialCountry = searchParams.get("country");
   const sourceHotspot = searchParams.get("source_hotspot");
@@ -57,6 +62,20 @@ export function VolunteerShell() {
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const validationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!keyboardInset || window.innerWidth >= 768) return;
+    const frame = requestAnimationFrame(() => {
+      const field = document.activeElement;
+      if (!(field instanceof HTMLElement) || !field.closest(".citizen-intake")) return;
+      const viewport = window.visualViewport;
+      const actionHeight = document.querySelector(".intake-actions")?.getBoundingClientRect().height ?? 64;
+      const availableBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) - actionHeight - 16;
+      const obscured = field.getBoundingClientRect().bottom - availableBottom;
+      if (obscured > 0) window.scrollBy({ top: obscured, behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [keyboardInset]);
 
   useEffect(() => () => { if (recordingTimeout.current) clearTimeout(recordingTimeout.current); const recorder = mediaRecorder.current; if (recorder) { recorder.onstop = null; if (recorder.state !== "inactive") recorder.stop(); } stream.current?.getTracks().forEach((track) => track.stop()); }, []);
   useEffect(() => { if (!recording) return; const timer = window.setInterval(() => setRecordingSeconds((value) => value + 1), 1000); return () => window.clearInterval(timer); }, [recording]);
@@ -153,11 +172,30 @@ export function VolunteerShell() {
     setAudioPreviewUrl(file.type.startsWith("audio/") ? URL.createObjectURL(file) : null);
   }
 
+  function deleteAttachment() {
+    setAttachment(null); setAttachmentName(""); setAudioPreviewUrl(null); setReplacement(null);
+  }
+  function requestRecording() {
+    if (!recording && attachment) { setReplacement({ kind: "record" }); return; }
+    void toggleRecording();
+  }
+  function requestAttachment(file?: File) {
+    if (!file) return;
+    if (attachment) setReplacement({ kind: "file", file });
+    else selectAttachment(file);
+  }
+  function confirmReplacement() {
+    const next = replacement; setReplacement(null);
+    if (next?.kind === "record") void toggleRecording();
+    else if (next?.kind === "file") selectAttachment(next.file);
+  }
+
   function focusValidation(message: string) {
     setValidationError(message);
     requestAnimationFrame(() => validationRef.current?.focus());
   }
   function goToLocation() {
+    if (recording) return;
     if (!text.trim() && !attachment) return focusValidation("Add a written report or voice recording before continuing.");
     setValidationError(null); setStep(2);
   }
@@ -177,33 +215,34 @@ export function VolunteerShell() {
 
   const status = statusQuery.data;
   return (
-    <main id="main-content" className="min-h-screen overflow-x-hidden bg-background px-4 py-5 pb-[max(6rem,env(safe-area-inset-bottom))] text-foreground">
+    <main id="main-content" data-keyboard-open={keyboardInset > 0} style={{ "--keyboard-inset": `${keyboardInset}px` } as CSSProperties} className="citizen-intake min-h-screen bg-background px-4 py-5 pb-[max(6rem,env(safe-area-inset-bottom))] text-foreground">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         <motion.header initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="intake-header">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">CivicBridge Citizen Portal</p><h1 className="mt-1 font-heading text-3xl font-normal">What needs attention in your neighbourhood?</h1></div></div>
-          <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Tell us in your own words. Add a place, review the details, and send when you’re ready.</p>
-          <Button asChild variant="ghost" size="sm" className="mt-3"><Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Back home</Link></Button>
+          <h1 data-no-ui-translation className="font-heading font-normal">{t("intakeTitle")}</h1>
+          <p data-no-ui-translation className="mt-2 text-sm text-muted-foreground">{t("intakeIntro")}</p>
         </motion.header>
 
         {sourceHotspot ? <div className="rounded-2xl border border-accent/30 bg-accent/5 p-4" role="status"><p className="font-semibold">You’re responding to a public hotspot{sourceCategory ? ` about ${sourceCategory.replaceAll("_", " ")}` : ""}.</p><p className="mt-1 text-sm text-muted-foreground">Country and administrative area were prefilled. Describe only your own experience; nothing is submitted automatically and no coordinates were copied.</p></div> : null}
         {validationError ? <div ref={validationRef} tabIndex={-1} role="alert" className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4"><p className="font-semibold">Please check this step</p><p className="mt-1 text-sm">{validationError}</p></div> : null}
 
-        <Card><CardHeader><ol className="intake-progress" aria-label="Report steps">{[1,2,3].map((value) => <li key={value} aria-current={step === value ? "step" : undefined}>{value} · <span>{value === 1 ? "Describe" : value === 2 ? "Locate & attach" : "Review"}</span></li>)}</ol><CardTitle>{step === 1 ? "What have you noticed?" : step === 2 ? "Add an area and optional evidence" : "Review and submit"}</CardTitle><CardDescription>Voice is welcome. Your report location starts empty, and browser location is used only with your permission.</CardDescription></CardHeader>
-          <CardContent className="space-y-5">
+        <Card><CardHeader className="intake-card-header"><ol className="intake-progress" aria-label="Report steps">{[1,2,3].map((value) => <li key={value} aria-current={step === value ? "step" : undefined}>{value} · <span>{value === 1 ? "Describe" : value === 2 ? "Locate & attach" : "Review"}</span></li>)}</ol>{step !== 1 ? <><CardTitle>{step === 2 ? "Add an area and optional evidence" : "Review and submit"}</CardTitle>{step === 2 ? <CardDescription>Your report location starts empty. Browser location is used only with your permission.</CardDescription> : null}</> : null}</CardHeader>
+          <CardContent className="intake-card-content space-y-4">
+            {replacement ? <div data-no-ui-translation role="alert" className="rounded-lg border border-warning/40 bg-warning/10 p-4"><p className="font-semibold">{t("replaceTitle")}</p><p className="mt-2 break-words text-sm">{attachmentName}</p><p className="mt-2 text-sm">{t("replaceBody")}</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={()=>setReplacement(null)}>{t("keepAttachment")}</Button><Button onClick={confirmReplacement}>{t(replacement.kind === "record" ? "replaceRecord" : "replaceFile")}</Button></div></div> : null}
             {step === 1 ? <>
-
-              <div className="rounded-2xl border border-accent/20 bg-accent/5 p-4"><Button type="button" className="w-full sm:w-auto" variant={recording ? "secondary" : "accent"} onClick={() => void toggleRecording()}>{recording ? <><Pause className="mr-2 h-4 w-4"/>Stop recording · {recordingSeconds}s</> : <><Mic className="mr-2 h-4 w-4"/>Record your report</>}</Button>{recording ? <div aria-label="Recording waveform" className="mt-4 flex h-8 items-center gap-1">{Array.from({ length: 20 }, (_, index) => <span key={index} className="w-1 animate-pulse rounded-full bg-accent" style={{ height: `${8 + ((index * 7) % 22)}px` }}/>)}</div> : null}{audioPreviewUrl ? <div className="mt-4 grid gap-3"><audio controls src={audioPreviewUrl} className="w-full"/><Button size="sm" variant="ghost" className="w-fit" onClick={() => { setAttachment(null); setAttachmentName(""); setAudioPreviewUrl(null); }}><RotateCcw className="mr-2 h-4 w-4"/>Delete or replace</Button></div> : null}<p className="mt-3 text-sm text-muted-foreground">Audio is private. The original is preserved for supported transcription and translation.</p></div>
-              <div className="space-y-2"><Label htmlFor="report">Describe the issue</Label><Textarea id="report" value={text} onChange={(e) => setText(e.target.value)} placeholder="Describe the issue, how long it has existed, and the outcome you are requesting." className="min-h-40 bg-background" /></div>
-              <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="country">Country</Label><select id="country" value={country} onChange={(e) => changeCountry(e.target.value as "IN"|"BR"|"ZA")} className="h-12 w-full rounded-lg border border-border bg-background px-3 text-base">{countries.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></div><div className="space-y-2"><Label htmlFor="language">Language</Label><select id="language" value={language} onChange={(e) => setLanguage(e.target.value)} className="h-12 w-full rounded-lg border border-border bg-background px-3 text-base">{languages.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div></div>
-              <div className="sticky bottom-0 -mx-2 bg-card/95 p-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur"><Button className="w-full" onClick={goToLocation}>Continue to location <ArrowRight className="ml-2 h-4 w-4"/></Button></div>
+              <div data-no-ui-translation className="input-mode" role="group" aria-label={t("inputMode")}><button type="button" disabled={recording} aria-pressed={inputMode === "write"} aria-controls="written-input" onClick={()=>setInputMode("write")}>{t("writeMode")}</button><button type="button" aria-pressed={inputMode === "record"} aria-controls="recorded-input" onClick={()=>setInputMode("record")}>{t("recordMode")}</button></div>
+              <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label htmlFor="country">Country</Label><select id="country" value={country} onChange={(e) => changeCountry(e.target.value as "IN"|"BR"|"ZA")} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm">{countries.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></div><div className="space-y-1"><Label data-no-ui-translation htmlFor="language">{t("reportLanguage")}</Label><select id="language" value={language} onChange={(e) => setLanguage(e.target.value)} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-sm">{languages.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div></div>
+              <div id="written-input" hidden={inputMode !== "write"} className="space-y-2"><Label htmlFor="report">Describe the issue</Label><Textarea id="report" value={text} onChange={(e) => setText(e.target.value)} placeholder="Describe the issue, how long it has existed, and the outcome you are requesting." className="min-h-36 bg-background" /></div>
+              <div id="recorded-input" hidden={inputMode !== "record"} className="rounded-lg border border-accent/20 bg-accent/5 p-4"><Button type="button" className="w-full sm:w-auto" variant={recording ? "secondary" : "accent"} onClick={requestRecording}>{recording ? <><Pause className="mr-2 h-4 w-4"/>Stop recording · {recordingSeconds}s</> : <><Mic className="mr-2 h-4 w-4"/>Record your report</>}</Button>{recording ? <div aria-label="Recording waveform" className="mt-4 flex h-8 items-center gap-1">{Array.from({ length: 20 }, (_, index) => <span key={index} className="w-1 animate-pulse rounded-full bg-accent" style={{ height: `${8 + ((index * 7) % 22)}px` }}/>)}</div> : null}{audioPreviewUrl ? <div className="mt-4 grid gap-3"><audio controls aria-label="Report audio preview" src={audioPreviewUrl} className="w-full"/><Button data-no-ui-translation size="sm" variant="ghost" className="w-fit" onClick={deleteAttachment}><RotateCcw className="mr-2 h-4 w-4"/>{t("deleteRecording")}</Button></div> : null}<label htmlFor="voice-evidence" className="mt-3 inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-border px-3 text-sm"><Upload className="mr-2 h-4 w-4"/>Upload an audio file</label><input id="voice-evidence" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg" className="sr-only" onChange={e=>{requestAttachment(e.target.files?.[0]);e.target.value="";}}/><p className="mt-3 text-sm text-muted-foreground">Audio is private. The original is preserved for supported transcription and translation.</p></div>
+              <p data-no-ui-translation className="text-xs leading-relaxed text-muted-foreground">{t("modeHint")}{inputMode === "write" && audioPreviewUrl ? <span className="mt-1 block font-semibold">{t("savedAudio")}</span> : inputMode === "record" && text.trim() ? <span className="mt-1 block font-semibold">{t("savedText")}</span> : null}</p>
+              <div className="intake-actions"><Button disabled={recording} className="w-full" onClick={goToLocation}>Continue to location <ArrowRight className="ml-2 h-4 w-4"/></Button></div>
             </> : null}
             {step === 2 ? <>
               <div className="space-y-2"><Label htmlFor="admin-area">Administrative area or landmark</Label><Input id="admin-area" value={adminHint} onChange={(e) => setAdminHint(e.target.value)} placeholder={`District, ward, or locality in ${countryName}`} aria-describedby="admin-area-help"/><p id="admin-area-help" className="text-sm text-muted-foreground">Required without browser location. Do not enter a house number or exact home address.</p></div>
               <div className="rounded-2xl border border-border bg-background p-4"><div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center"><div><p className="font-semibold">{location ? "Approximate location added" : "No browser location added"}</p><p className="text-sm text-muted-foreground">{location ? "Precision is reduced before submission; coordinates are not shown as the primary location." : "Country selection never creates coordinates. Administrative-area text is enough to continue."}</p></div><Button type="button" variant="outline" onClick={requestLocation}><LocateFixed className="mr-2 h-4 w-4"/>Use approximate location</Button></div></div>
-              <div className="rounded-2xl border border-border bg-background p-4"><Label htmlFor="evidence" className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-border px-4 py-2.5"><Upload className="mr-2 h-4 w-4"/>Attach optional evidence</Label><input id="evidence" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,image/jpeg,image/png" className="sr-only" onChange={(e) => selectAttachment(e.target.files?.[0])}/><p className="mt-2 break-words text-sm text-muted-foreground">JPG, PNG, or supported audio; maximum 10 MB. {attachmentName ? `Selected: ${attachmentName}` : "No attachment selected."}</p>{attachment && attachment.type.startsWith("image/") ? <p className="mt-3 flex items-center gap-2 rounded-xl bg-muted/50 p-3 text-sm"><Upload className="h-4 w-4"/>Image ready for private upload</p> : null}</div>
-              <div className="sticky bottom-0 -mx-2 flex gap-2 bg-card/95 p-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur"><Button variant="ghost" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button><Button className="flex-1" onClick={goToReview}>Review report <ArrowRight className="ml-2 h-4 w-4"/></Button></div>
+              <div className="rounded-2xl border border-border bg-background p-4"><Label htmlFor="evidence" className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-border px-4 py-2.5"><Upload className="mr-2 h-4 w-4"/>Attach optional evidence</Label><input id="evidence" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,image/jpeg,image/png" className="sr-only" onChange={(e) => { requestAttachment(e.target.files?.[0]); e.target.value=""; }}/><p className="mt-2 break-words text-sm text-muted-foreground">JPG, PNG, or supported audio; maximum 10 MB. {attachmentName ? `Selected: ${attachmentName}` : "No attachment selected."}</p>{attachment && attachment.type.startsWith("image/") ? <p className="mt-3 flex items-center gap-2 rounded-xl bg-muted/50 p-3 text-sm"><Upload className="h-4 w-4"/>Image ready for private upload</p> : null}{attachment ? <Button data-no-ui-translation variant="ghost" size="sm" className="mt-3" onClick={deleteAttachment}>{t("removeAttachment")}</Button> : null}</div>
+              <div className="intake-actions flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button><Button className="flex-1" onClick={goToReview}>Review report <ArrowRight className="ml-2 h-4 w-4"/></Button></div>
             </> : null}
-            {step === 3 ? <><div className="grid gap-3 sm:grid-cols-2"><ReviewItem label="Country" value={countryName}/><ReviewItem label="Language" value={languages.find((item) => item.value === language)?.label ?? language}/><ReviewItem label="Administrative area" value={adminHint.trim() || "Approximate browser area"}/><ReviewItem label="Report" value={text.trim() || (attachment?.type.startsWith("audio/") ? "Voice recording" : "Attached evidence")}/><ReviewItem label="Attachment" value={attachmentName || "None"}/><ReviewItem label="Location precision" value={location ? "Reduced approximate area" : "Administrative area only; no coordinates"}/></div><label className="flex min-h-14 items-start gap-3 rounded-2xl border border-border bg-background p-4"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0"/><span><span className="font-semibold">I consent to CivicBridge processing this report.</span><span className="mt-1 block text-sm text-muted-foreground">Original content remains private; tracking stores only the request ID in this browser.</span></span></label>{createMutation.isPending ? <div aria-live="polite"><p className="mt-2 text-sm text-muted-foreground">{submissionPhase === "saving" ? "Saving report…" : "Uploading evidence…"}</p></div> : null}<div className="sticky bottom-0 -mx-2 flex gap-2 bg-card/95 p-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur"><Button variant="ghost" onClick={() => setStep(2)}><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button><Button className="flex-1" disabled={createMutation.isPending || recording} onClick={submit}>{createMutation.isPending ? <><RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>Submitting</> : <><Send className="mr-2 h-4 w-4"/>Submit request</>}</Button></div></> : null}
+            {step === 3 ? <><div className="grid gap-3 sm:grid-cols-2"><ReviewItem label="Country" value={countryName}/><ReviewItem label="Language" value={languages.find((item) => item.value === language)?.label ?? language}/><ReviewItem label="Administrative area" value={adminHint.trim() || "Approximate browser area"}/><ReviewItem label="Report" value={text.trim() || (attachment?.type.startsWith("audio/") ? "Voice recording" : "Attached evidence")}/><ReviewItem label="Attachment" value={attachmentName || "None"}/><ReviewItem label="Location precision" value={location ? "Reduced approximate area" : "Administrative area only; no coordinates"}/></div><label className="flex min-h-14 items-start gap-3 rounded-2xl border border-border bg-background p-4"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0"/><span><span className="font-semibold">I consent to CivicBridge processing this report.</span><span className="mt-1 block text-sm text-muted-foreground">Original content remains private; tracking stores only the request ID in this browser.</span></span></label>{createMutation.isPending ? <div aria-live="polite"><p className="mt-2 text-sm text-muted-foreground">{submissionPhase === "saving" ? "Saving report…" : "Uploading evidence…"}</p></div> : null}<div className="intake-actions flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}><ArrowLeft className="mr-2 h-4 w-4"/>Back</Button><Button className="flex-1" disabled={createMutation.isPending || recording} onClick={submit}>{createMutation.isPending ? <><RefreshCcw className="mr-2 h-4 w-4 animate-spin"/>Submitting</> : <><Send className="mr-2 h-4 w-4"/>Submit request</>}</Button></div></> : null}
           </CardContent>
         </Card>
 
